@@ -105,3 +105,48 @@ export interface AuthResponse {
   token?: string
   user?: User
 }
+
+// Medication interaction and duplicate therapy types
+export interface MedicationInteraction {
+  id: string
+  medication1: string
+  medication2: string
+  severity: "minor" | "moderate" | "major" | "critical"
+  description: string
+  recommendation: string
+}
+
+export interface DuplicateTherapy {
+  id: string
+  medications: string[]
+  therapeuticClass: string
+  description: string
+  recommendation: string
+}
+
+export interface MedicationCheckResult {
+  interactions: MedicationInteraction[]
+  duplicates: DuplicateTherapy[]
+  overallRisk: "low" | "moderate" | "high" | "critical"
+  contactProvider: boolean
+  summary: string
+}
+
+// Appointment preparation types
+export interface PrepChecklistItem {
+  id: string
+  text: string
+  completed: boolean
+  category: "documents" | "symptoms" | "questions" | "lifestyle" | "medications"
+}
+
+export interface AppointmentPrepPack {
+  appointmentId: string
+  appointmentReason: string
+  appointmentDate: Date
+  checklist: PrepChecklistItem[]
+  questionsToAsk: string[]
+  thingsToMention: string[]
+  documentsNeeded: string[]
+  summary: string
+}

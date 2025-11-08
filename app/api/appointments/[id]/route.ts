@@ -12,16 +12,26 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     const payload = await request.json()
     const updates: Record<string, any> = { updatedAt: new Date() }
-    if (payload.status) updates.status = payload.status
+    if (payload.status) {
+      updates.status = payload.status
+      // Track cancellation metadata
+      if (payload.status === "cancelled") {
+        updates.cancelledAt = new Date()
+        if (payload.cancellationReason) {
+          updates.cancellationReason = payload.cancellationReason
+        }
+      }
+    }
     if (payload.date) updates.date = new Date(payload.date)
     if (payload.time) updates.time = payload.time
     if (payload.notes !== undefined) updates.notes = payload.notes
+    if (payload.reason !== undefined) updates.reason = payload.reason
 
     const appointments = await getCollection("appointments")
     const objectId = new ObjectId(id)
 
     const result = await appointments.findOneAndUpdate({ _id: objectId }, { $set: updates }, { returnDocument: "after" })
-    if (!result.value) {
+    if (!result || !result.value) {
       return NextResponse.json({ success: false, message: "Appointment not found" }, { status: 404 })
     }
 

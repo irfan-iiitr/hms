@@ -18,6 +18,7 @@ import type { MedicalRecord, Prescription, Appointment, MedicalFileInfo } from "
 import { LogOut, FileText, Pill, Calendar, Save, UploadCloud, X } from "lucide-react"
 import Link from "next/link"
 import { MedicalFilesInfoBox } from "../dashboards/medical-files-info-box"
+import { AppointmentCountdownCard } from "../appointment-countdown-card"
 
 export default function PatientDashboard() {
   // Upload modal state and handlers
@@ -316,6 +317,36 @@ export default function PatientDashboard() {
             </Card>
           </Link>
         </div>
+
+        {/* Appointment Countdown - Prominent placement */}
+        {appointments.filter((a) => a.status === "scheduled").length > 0 && (
+          <div className="mb-8">
+            <AppointmentCountdownCard
+              appointment={appointments.filter((a) => a.status === "scheduled")[0]}
+              onUpdate={(updatedAppointment) => {
+                // Update appointments list
+                setAppointments((prev) =>
+                  prev.map((apt) =>
+                    (apt.id === updatedAppointment.id || apt._id === updatedAppointment._id)
+                      ? updatedAppointment
+                      : apt
+                  )
+                )
+              }}
+              onCancel={(appointmentId) => {
+                // Refresh appointments list
+                const patientId = user?.id || (user as any)?._id?.toString?.()
+                if (patientId) {
+                  fetchAppointmentsByPatient(patientId).then(setAppointments)
+                }
+                toast({
+                  title: "Appointment cancelled",
+                  description: "Your appointment has been cancelled successfully.",
+                })
+              }}
+            />
+          </div>
+        )}
 
         {/* Upload Medical Files Modal */}
         {showUploadForm && (
