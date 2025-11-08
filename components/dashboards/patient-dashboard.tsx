@@ -1,5 +1,3 @@
-"use client"
-
 import React, { useState, useEffect, useRef } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
@@ -19,6 +17,12 @@ import { LogOut, FileText, Pill, Calendar, Save, UploadCloud, X } from "lucide-r
 import Link from "next/link"
 import { MedicalFilesInfoBox } from "../dashboards/medical-files-info-box"
 import { AppointmentCountdownCard } from "../appointment-countdown-card"
+import { 
+  DashboardStatsSkeleton, 
+  MedicalRecordsListSkeleton, 
+  PrescriptionsListSkeleton, 
+  AppointmentsListSkeleton 
+} from "@/components/ui/loading-skeletons"
 
 export default function PatientDashboard() {
   // Upload modal state and handlers
@@ -128,6 +132,11 @@ export default function PatientDashboard() {
       console.log("Medical file upload API response:", data)
       if (!res.ok || !data.success) {
         setUploadError(data.message || "Failed to upload file.")
+        toast({ 
+          title: "❌ Upload failed", 
+          description: data.message || "Failed to upload file.",
+          variant: "destructive"
+        })
       } else {
         // Update local state immediately with the saved item
         if (data.savedItem) {
@@ -135,12 +144,20 @@ export default function PatientDashboard() {
         }
         // Also refresh from server to ensure consistency
         await refreshUserData()
-        toast({ title: "File uploaded", description: "Your medical file has been uploaded and processed." })
+        toast({ 
+          title: "✅ File uploaded successfully", 
+          description: "Your medical file has been uploaded and processed."
+        })
         setShowUploadForm(false)
         setSelectedFile(null)
       }
     } catch (err) {
       setUploadError("Failed to upload file.")
+      toast({ 
+        title: "❌ Upload error", 
+        description: "An unexpected error occurred while uploading.",
+        variant: "destructive"
+      })
     } finally {
       setUploading(false)
     }
@@ -160,6 +177,7 @@ export default function PatientDashboard() {
   const [recordSummaries, setRecordSummaries] = useState<Record<string, { loading: boolean; data?: { title: string; summary: string; disclaimer: string }; error?: string }>>({})
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [isLoadingData, setIsLoadingData] = useState(true)
 
   useEffect(() => {
     const patientId = user?.id || (user as any)?._id?.toString?.()
@@ -167,6 +185,7 @@ export default function PatientDashboard() {
     let mounted = true
 
     const loadData = async () => {
+      setIsLoadingData(true)
       try {
         const [recordsData, prescriptionsData, appointmentsData] = await Promise.all([
           fetchMedicalRecordsByPatient(patientId),
@@ -179,6 +198,13 @@ export default function PatientDashboard() {
         setAppointments(appointmentsData)
       } catch (error) {
         console.error("[PatientDashboard] Failed to load data", error)
+        toast({ 
+          title: "Error loading data", 
+          description: "Failed to load your medical data. Please try refreshing the page.",
+          variant: "destructive"
+        })
+      } finally {
+        if (mounted) setIsLoadingData(false)
       }
     }
 
@@ -221,7 +247,10 @@ export default function PatientDashboard() {
         updateProfile(updated)
         setProfileSaved(true)
         setShowProfileForm(false)
-        toast({ title: "Profile saved", description: "Your medical information has been updated." })
+        toast({ 
+          title: "✅ Profile updated", 
+          description: "Your medical information has been successfully saved."
+        })
       } catch (err) {
         console.warn("[PatientDashboard] server update failed, falling back to local storage", err)
         const { saveUser } = await import("@/lib/storage")
@@ -230,10 +259,18 @@ export default function PatientDashboard() {
         updateProfile(merged)
         setProfileSaved(true)
         setShowProfileForm(false)
-        toast({ title: "Profile saved (local)", description: "Saved to local storage." })
+        toast({ 
+          title: "✅ Profile saved", 
+          description: "Saved to local storage."
+        })
       }
     } catch (error) {
       console.error("[PatientDashboard] Failed to save profile", error)
+      toast({ 
+        title: "❌ Error", 
+        description: "Failed to save profile. Please try again.",
+        variant: "destructive"
+      })
     } finally {
       setSavingProfile(false)
     }
@@ -271,52 +308,56 @@ export default function PatientDashboard() {
         </div>
 
         {/* Quick Stats - All Clickable */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Link href="/dashboard/medical-records">
-            <Card className="hover:shadow-lg transition-all cursor-pointer hover:border-primary/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-                  <span>Medical Records</span>
-                  <FileText className="w-4 h-4" />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{records.length}</div>
-                <p className="text-xs text-muted-foreground mt-1">Click to view all</p>
-              </CardContent>
-            </Card>
-          </Link>
+        {isLoadingData ? (
+          <DashboardStatsSkeleton />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Link href="/dashboard/medical-records">
+              <Card className="hover:shadow-lg transition-all cursor-pointer hover:border-primary/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+                    <span>Medical Records</span>
+                    <FileText className="w-4 h-4" />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{records.length}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Click to view all</p>
+                </CardContent>
+              </Card>
+            </Link>
 
-          <Link href="/dashboard/prescriptions">
-            <Card className="hover:shadow-lg transition-all cursor-pointer hover:border-primary/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-                  <span>Active Prescriptions</span>
-                  <Pill className="w-4 h-4" />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{prescriptions.length}</div>
-                <p className="text-xs text-muted-foreground mt-1">Click to view all</p>
-              </CardContent>
-            </Card>
-          </Link>
+            <Link href="/dashboard/prescriptions">
+              <Card className="hover:shadow-lg transition-all cursor-pointer hover:border-primary/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+                    <span>Active Prescriptions</span>
+                    <Pill className="w-4 h-4" />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{prescriptions.length}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Click to view all</p>
+                </CardContent>
+              </Card>
+            </Link>
 
-          <Link href="/dashboard/appointments">
-            <Card className="hover:shadow-lg transition-all cursor-pointer hover:border-primary/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-                  <span>Upcoming</span>
-                  <Calendar className="w-4 h-4" />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{upcomingAppointments}</div>
-                <p className="text-xs text-muted-foreground mt-1">Appointments</p>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
+            <Link href="/dashboard/appointments">
+              <Card className="hover:shadow-lg transition-all cursor-pointer hover:border-primary/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+                    <span>Upcoming</span>
+                    <Calendar className="w-4 h-4" />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{upcomingAppointments}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Appointments</p>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        )}
 
         {/* Appointment Countdown - Prominent placement */}
         {appointments.filter((a) => a.status === "scheduled").length > 0 && (
@@ -456,11 +497,12 @@ export default function PatientDashboard() {
               <CardDescription>Your recent health history</CardDescription>
             </CardHeader>
             <CardContent>
-              {records.length === 0 ? (
+              {isLoadingData ? (
+                <MedicalRecordsListSkeleton />
+              ) : records.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No medical records yet</p>
               ) : (
-                <div className="space-y-4">
-                  {records.slice(0, 3).map((record) => (
+                <div className="space-y-4">{records.slice(0, 3).map((record) => (
                     <div
                       key={record.id}
                       className="border border-border rounded-lg p-4 hover:bg-muted/50 transition-colors"
@@ -563,7 +605,9 @@ export default function PatientDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {appointments.filter((a) => a.status === "scheduled").length === 0 ? (
+                {isLoadingData ? (
+                  <AppointmentsListSkeleton />
+                ) : appointments.filter((a) => a.status === "scheduled").length === 0 ? (
                   <p className="text-muted-foreground text-sm">No appointments scheduled</p>
                 ) : (
                   <div className="space-y-2">
@@ -597,7 +641,9 @@ export default function PatientDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {prescriptions.length === 0 ? (
+                {isLoadingData ? (
+                  <PrescriptionsListSkeleton />
+                ) : prescriptions.length === 0 ? (
                   <p className="text-muted-foreground text-sm">No active prescriptions</p>
                 ) : (
                   <div className="space-y-2">

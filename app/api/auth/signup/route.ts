@@ -1,22 +1,25 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { getCollection } from "@/lib/db";
+import { createSession } from "@/lib/session";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password, fullName, role } = await request.json();
-    console.log("[API] /api/auth/signup POST", { hasEmail: !!email, hasPassword: !!password, hasFullName: !!fullName, role });
+    logger.apiRequest('POST', '/api/auth/signup', { email, role });
 
     if (!email || !password || !fullName  || !role) {
+      logger.warn('Signup attempt with missing fields');
       return NextResponse.json({ success: false, message: "Missing required fields" }, { status: 400 });
     }
 
     const users = await getCollection("users");
-    console.log("[API] /api/auth/signup POST collection ready");
+    logger.dbOperation('findOne', 'users', { email });
 
     // Check if user already exists
     const existingUser = await users.findOne({ email });
-    console.log("[API] /api/auth/signup POST existing user lookup", { found: !!existingUser });
     if (existingUser) {
+      logger.warn('Signup attempt for existing user', { email });
       return NextResponse.json({ success: false, message: "User already exists" }, { status: 409 });
     }
 
@@ -26,14 +29,17 @@ export async function POST(request: NextRequest) {
       password,
       fullName,
       role,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
-    console.log("[API] /api/auth/signup POST payload prepared", { email, role });
+    
+    logger.dbOperation('insertOne', 'users', { email, role });
     const result = await users.insertOne(newUser);
-    console.log("[API] /api/auth/signup POST insert complete", { insertedId: result.insertedId.toString() });
 
-    // Generate a mock token (replace with JWT in production)
-    const token = Buffer.from(`${email}:${Date.now()}`).toString("base64");
-    console.log("[API] /api/auth/signup POST token generated");
+    // Create session in MongoDB
+    const userAgent = request.headers.get('user-agent') || undefined;
+    const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined;
+    const token = await createSession(result.insertedId.toString(), userAgent, ipAddress);
 
     const response = {
       success: true,
@@ -44,12 +50,16 @@ export async function POST(request: NextRequest) {
         email,
         fullName,
         role,
+        id: result.insertedId.toString(),
       },
     };
-    console.log("[API] /api/auth/signup POST success", { email });
+    
+    logger.auth('User signed up successfully', { userId: result.insertedId.toString(), email });
+    logger.apiResponse('POST', '/api/auth/signup', 200, { userId: result.insertedId.toString() });
+    
     return NextResponse.json(response);
   } catch (error) {
-    console.error("[API] /api/auth/signup POST error", error);
+    logger.error('Signup failed', error);
     return NextResponse.json(
       { success: false, message: error instanceof Error ? error.message : "Server error" },
       { status: 500 },

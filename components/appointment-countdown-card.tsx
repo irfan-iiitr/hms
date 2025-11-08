@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -16,6 +16,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Calendar, Clock, AlertCircle, X, Edit, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import type { Appointment } from "@/lib/types"
 import {
   getTimeRemaining,
@@ -38,14 +39,18 @@ export function AppointmentCountdownCard({
   onUpdate,
   onCancel,
 }: AppointmentCountdownCardProps) {
+  const { toast } = useToast()
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining | null>(null)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [cancellationReason, setCancellationReason] = useState("")
   const [cancelling, setCancelling] = useState(false)
   const [rescheduling, setRescheduling] = useState(false)
 
-  // Calculate appointment datetime
-  const appointmentDateTime = combineDateTime(appointment.date, appointment.time || "09:00")
+    // Memoize appointment datetime to prevent recalculation on every render
+    const appointmentDateTime = useMemo(
+      () => combineDateTime(appointment.date, appointment.time || "09:00"),
+      [appointment.date, appointment.time]
+    )
 
   // Update countdown every second
   useEffect(() => {
@@ -82,11 +87,20 @@ export function AppointmentCountdownCard({
         throw new Error(data.message || "Failed to cancel appointment")
       }
 
+      toast({
+        title: "✅ Appointment cancelled",
+        description: "Your appointment has been successfully cancelled."
+      })
+      
       onCancel?.(appointmentId)
       setShowCancelDialog(false)
     } catch (error) {
       console.error("Failed to cancel appointment:", error)
-      alert(error instanceof Error ? error.message : "Failed to cancel appointment")
+      toast({
+        title: "❌ Cancellation failed",
+        description: error instanceof Error ? error.message : "Failed to cancel appointment",
+        variant: "destructive"
+      })
     } finally {
       setCancelling(false)
     }
@@ -95,8 +109,11 @@ export function AppointmentCountdownCard({
   const handleReschedule = () => {
     setRescheduling(true)
     // In a real implementation, this would open a reschedule modal/page
-    // For now, we'll just show an alert
-    alert("Reschedule functionality: Navigate to appointments page to reschedule")
+    // For now, we'll just show a toast
+    toast({
+      title: "Reschedule feature",
+      description: "Navigate to appointments page to reschedule this appointment."
+    })
     setRescheduling(false)
   }
 
