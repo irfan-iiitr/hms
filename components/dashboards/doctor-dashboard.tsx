@@ -14,7 +14,7 @@ import {
 } from "@/lib/api"
 import { fetchUserById } from "@/lib/get-user"
 import type { MedicalRecord, Appointment, User, Prescription } from "@/lib/types"
-import { Stethoscope, Calendar, Users, LogOut, Pill, BarChart3 } from "lucide-react"
+import { Stethoscope, Calendar, Users, LogOut, Pill, BarChart3, Brain, Image as ImageIcon } from "lucide-react"
 import Link from "next/link"
 
 
@@ -146,6 +146,18 @@ export default function DoctorDashboard() {
             <p className="text-muted-foreground mt-2">Manage patients and prescriptions</p>
           </div>
           <div className="flex gap-2">
+            <Link href="/dashboard/doctor/clinical-tools">
+              <Button variant="outline" size="lg" className="gap-2 bg-transparent">
+                <Brain className="w-4 h-4" />
+                AI Tools
+              </Button>
+            </Link>
+            <Link href="/dashboard/doctor/image-analysis">
+              <Button variant="outline" size="lg" className="gap-2 bg-transparent">
+                <ImageIcon className="w-4 h-4" />
+                Image Analysis
+              </Button>
+            </Link>
             <Link href="/dashboard/doctor/analytics">
               <Button variant="outline" size="lg" className="gap-2 bg-transparent">
                 <BarChart3 className="w-4 h-4" />

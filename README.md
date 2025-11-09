@@ -13,7 +13,15 @@ A comprehensive healthcare management system built with Next.js, featuring role-
 ### Doctor Dashboard
 - Patient list management
 - Medical record creation and management
-- AI-powered prescription suggestions (Gemini AI)
+- **AI-powered prescription suggestions (Gemini AI)**
+- **📊 Analytics & Insights Dashboard** - Real-time statistics, trends, and visualizations
+- **🧠 AI Clinical Decision Support Tools:**
+  - Differential diagnosis generator
+  - Drug interaction checker
+  - Medical literature search
+  - Medical image analysis (X-ray, CT, MRI)
+  - Voice-to-text clinical notes
+  - Dosage calculator
 - Appointment management
 - Patient history and analytics
 
@@ -45,11 +53,12 @@ A comprehensive healthcare management system built with Next.js, featuring role-
 
 ## Technology Stack
 
-- **Frontend**: Next.js 16, React, TypeScript
+- **Frontend**: Next.js 16, React 18, TypeScript
 - **Styling**: Tailwind CSS v4, shadcn/ui components
-- **State Management**: React Context API, localStorage
-- **AI**: Gemini API (simulated for demo)
-- **Database**: Client-side localStorage (in production, would use PostgreSQL/MongoDB)
+- **State Management**: React Context API, localStorage + MongoDB sessions
+- **AI**: Google Gemini 1.5 Flash API
+- **Database**: MongoDB (with localStorage fallback for some features)
+- **Charts**: Recharts 2.15.4
 
 ## Project Structure
 
@@ -85,14 +94,23 @@ lib/
 1. **Install dependencies**:
    \`\`\`bash
    npm install
+   # or
+   pnpm install
    \`\`\`
 
-2. **Run the development server**:
+2. **Setup environment variables**:
+   Create a `.env` file with:
+   \`\`\`bash
+   MONGODB_URI=mongodb://localhost:27017/hms
+   GEMINI_API_KEY=your_gemini_api_key_here
+   \`\`\`
+
+3. **Run the development server**:
    \`\`\`bash
    npm run dev
    \`\`\`
 
-3. **Open in browser**:
+4. **Open in browser**:
    - Navigate to `http://localhost:3000`
    - Select a role and login with demo credentials
 
@@ -118,10 +136,35 @@ lib/
 
 ## AI Features
 
-The system includes AI prescription suggestions powered by Gemini API. When a doctor creates a medical record, they can:
+The system includes comprehensive AI-powered clinical tools using Google's Gemini 1.5 Flash:
+
+### AI Prescription Suggestions
+When a doctor creates a medical record, they can:
 1. Generate AI-powered prescription suggestions based on diagnosis
 2. Review AI recommendations
 3. Customize recommendations before saving
+
+### AI Clinical Decision Support (NEW)
+- **Differential Diagnosis**: Generate ranked diagnoses from symptoms with probability scores
+- **Drug Interaction Checker**: Real-time checking of medication interactions with severity levels
+- **Medical Literature Search**: Search research papers, clinical trials, and guidelines
+- **Medical Image Analysis**: AI analysis of X-rays, CT scans, and MRIs with findings and recommendations
+- **Voice Clinical Notes**: Record and transcribe clinical notes with automatic medical entity extraction
+- **Dosage Calculator**: Calculate medication dosages based on patient factors (weight, age, renal/hepatic function)
+
+All AI tools are integrated directly into doctor workflows with real MongoDB storage (no mocking).
+
+See [AI_CLINICAL_TOOLS_IMPLEMENTATION.md](./AI_CLINICAL_TOOLS_IMPLEMENTATION.md) for complete documentation.
+
+### Analytics Dashboard (NEW)
+- **Patient Statistics**: Total patients, new patients, demographics breakdown
+- **Appointment Analytics**: Completed, pending, cancelled counts with hourly and daily patterns
+- **Medical Insights**: Top diagnoses, medications, seasonal trends
+- **Performance Metrics**: Average wait time, patient satisfaction, bed occupancy
+- **Visualizations**: 10+ interactive charts (pie, bar, line) using Recharts
+- **Export**: Export all analytics data to JSON
+
+See [ANALYTICS_DASHBOARD_IMPLEMENTATION.md](./ANALYTICS_DASHBOARD_IMPLEMENTATION.md) for complete documentation.
 
 ## Future Enhancements
 

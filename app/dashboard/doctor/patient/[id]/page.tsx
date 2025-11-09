@@ -17,8 +17,10 @@ import {
   createPrescription,
 } from "@/lib/api"
 import type { User, MedicalRecord, Prescription } from "@/lib/types"
-import { FileText, Pill, ArrowLeft, Plus } from "lucide-react"
+import { FileText, Pill, ArrowLeft, Plus, Brain, AlertTriangle } from "lucide-react"
 import { MedicalFilesInfoBox } from "@/components/dashboards/medical-files-info-box"
+import { VoiceRecorder } from "@/components/voice-recorder"
+import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 
@@ -26,14 +28,18 @@ export default function PatientDetailPage() {
   const { user } = useAuth()
   const params = useParams()
   const patientId = params.id as string
+  const { toast } = useToast()
 
   const [patient, setPatient] = useState<User | null>(null)
   const [records, setRecords] = useState<MedicalRecord[]>([])
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
   const [showRecordForm, setShowRecordForm] = useState(false)
   const [showPrescriptionForm, setShowPrescriptionForm] = useState(false)
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false)
   const [doctors, setDoctors] = useState<User[]>([])
   const [selectedDoctorId, setSelectedDoctorId] = useState("")
+  const [drugInteractions, setDrugInteractions] = useState<any>(null)
+  const [checkingInteractions, setCheckingInteractions] = useState(false)
 
   // Record form
   const [diagnosis, setDiagnosis] = useState("")
@@ -125,6 +131,73 @@ export default function PatientDetailPage() {
     }
   }
 
+  // Handle voice transcription completion
+  const handleTranscriptionComplete = (processedNotes: any) => {
+    console.log("[DoctorPatientPage] Voice transcription completed", processedNotes)
+    
+    // Auto-populate form fields from processed notes
+    if (processedNotes.diagnosis) {
+      setDiagnosis((prev) => prev ? `${prev}; ${processedNotes.diagnosis}` : processedNotes.diagnosis)
+    }
+    if (processedNotes.symptoms && processedNotes.symptoms.length > 0) {
+      setSymptoms((prev) => prev ? `${prev}, ${processedNotes.symptoms.join(", ")}` : processedNotes.symptoms.join(", "))
+    }
+    if (processedNotes.notes) {
+      setNotes((prev) => prev ? `${prev}\n\n${processedNotes.notes}` : processedNotes.notes)
+    }
+
+    toast({
+      title: "Voice notes processed",
+      description: "Medical information extracted and added to form",
+    })
+    setShowVoiceRecorder(false)
+  }
+
+  // Check drug interactions before adding prescription
+  const checkDrugInteractions = async () => {
+    const medicationNames = medications.map(m => m.name).filter(Boolean)
+    if (medicationNames.length < 2) {
+      return // Need at least 2 medications to check interactions
+    }
+
+    setCheckingInteractions(true)
+    try {
+      const response = await fetch("/api/clinical-tools/drug-interactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ medications: medicationNames }),
+      })
+
+      if (!response.ok) throw new Error("Failed to check interactions")
+
+      const data = await response.json()
+      setDrugInteractions(data)
+
+      // Show warning if interactions found
+      if (data.hasInteractions) {
+        toast({
+          title: "⚠️ Drug Interactions Detected",
+          description: `Found ${data.interactions.length} potential interaction(s). Review before prescribing.`,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "✓ No Interactions",
+          description: "No known drug interactions detected",
+        })
+      }
+    } catch (error) {
+      console.error("Failed to check drug interactions:", error)
+      toast({
+        title: "Interaction check failed",
+        description: "Could not verify drug interactions. Please review manually.",
+        variant: "destructive",
+      })
+    } finally {
+      setCheckingInteractions(false)
+    }
+  }
+
   const handleAddPrescription = async (e: React.FormEvent) => {
     e.preventDefault()
     const doctorId = user?.id || (user as any)?._id?.toString?.() || selectedDoctorId
@@ -133,6 +206,9 @@ export default function PatientDetailPage() {
       setError("Create a medical record first before adding a prescription.")
       return
     }
+
+    // Check drug interactions before saving
+    await checkDrugInteractions()
 
     setLoading(true)
     try {
@@ -149,6 +225,7 @@ export default function PatientDetailPage() {
       setRxNotes("")
       setShowPrescriptionForm(false)
       setPrescriptions((prev) => [created, ...prev])
+      setDrugInteractions(null) // Clear interactions after saving
     } finally {
       setLoading(false)
     }
@@ -233,6 +310,35 @@ export default function PatientDetailPage() {
             )}
           </div>
 
+          {/* AI Clinical Tools Access */}
+          {(user?.role === "doctor" || user?.role === "admin") && (
+            <div className="mb-6">
+              <Card className="border-primary/30 bg-linear-to-br from-primary/5 to-transparent">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 rounded-lg bg-primary/10">
+                        <Brain className="w-6 h-6 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">AI Clinical Decision Support</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Differential diagnosis, drug interactions, literature search, and more
+                        </p>
+                      </div>
+                    </div>
+                    <Link href={`/dashboard/doctor/clinical-tools?patientId=${patientId}`}>
+                      <Button className="gap-2">
+                        <Brain className="w-4 h-4" />
+                        Open AI Tools
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {/* Patient Profile Overview */}
           <Card className="mb-6">
             <CardHeader>
@@ -282,9 +388,26 @@ export default function PatientDetailPage() {
           {showRecordForm && (
             <Card className="mb-6 border-primary/50">
               <CardHeader>
-                <CardTitle>Add Medical Record</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Add Medical Record</CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowVoiceRecorder(!showVoiceRecorder)}
+                    className="gap-2"
+                  >
+                    <Brain className="w-4 h-4" />
+                    {showVoiceRecorder ? "Hide" : "Voice Notes"}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
+                {showVoiceRecorder && (
+                  <div className="mb-4 p-4 bg-muted/50 rounded-lg border border-border">
+                    <VoiceRecorder onTranscriptionComplete={handleTranscriptionComplete} />
+                  </div>
+                )}
                 <form onSubmit={handleAddRecord} className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Diagnosis</label>
@@ -349,9 +472,60 @@ export default function PatientDetailPage() {
           {showPrescriptionForm && (
             <Card className="mb-6 border-primary/50">
               <CardHeader>
-                <CardTitle>Create Prescription</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Create Prescription</CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={checkDrugInteractions}
+                    disabled={checkingInteractions || medications.filter(m => m.name).length < 2}
+                    className="gap-2"
+                  >
+                    <Brain className="w-4 h-4" />
+                    {checkingInteractions ? "Checking..." : "Check Interactions"}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
+                {/* Drug Interaction Warning */}
+                {drugInteractions && drugInteractions.hasInteractions && (
+                  <div className="mb-4 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-destructive mb-2">
+                          Drug Interactions Detected ({drugInteractions.interactions.length})
+                        </h4>
+                        <div className="space-y-3">
+                          {drugInteractions.interactions.map((interaction: any, idx: number) => (
+                            <div key={idx} className="text-sm">
+                              <p className="font-medium">{interaction.drugs.join(" + ")}</p>
+                              <p className="text-muted-foreground mt-1">{interaction.description}</p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  interaction.severity === "severe" 
+                                    ? "bg-destructive text-destructive-foreground"
+                                    : interaction.severity === "moderate"
+                                    ? "bg-orange-500 text-white"
+                                    : "bg-yellow-500 text-black"
+                                }`}>
+                                  {interaction.severity.toUpperCase()}
+                                </span>
+                                {interaction.recommendation && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {interaction.recommendation}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <form onSubmit={handleAddPrescription} className="space-y-4">
                   <div className="space-y-3">
                     {medications.map((med, idx) => (

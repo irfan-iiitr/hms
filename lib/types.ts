@@ -246,3 +246,92 @@ export interface DoctorAnalytics {
     }
   }
 }
+
+// AI Clinical Tools types
+export interface DifferentialDiagnosis {
+  condition: string
+  probability: "High" | "Moderate" | "Low"
+  severity: "Critical" | "Severe" | "Moderate" | "Mild"
+  reasoning: string
+  recommendedTests: string[]
+}
+
+export interface DifferentialDiagnosisResult {
+  differentialDiagnoses: DifferentialDiagnosis[]
+  urgencyLevel: "Emergency" | "Urgent" | "Routine"
+  redFlags: string[]
+  recommendedActions: string[]
+}
+
+export interface DrugInteraction {
+  medications: string[]
+  severity: "Critical" | "Major" | "Moderate" | "Minor"
+  description: string
+  recommendation: string
+  alternatives: string[]
+}
+
+export interface DrugInteractionResult {
+  hasInteractions: boolean
+  interactions: DrugInteraction[]
+  dosageWarnings: string[]
+  patientSpecificWarnings: string[]
+  overallRisk: "Critical" | "High" | "Moderate" | "Low"
+}
+
+export interface LiteratureResult {
+  title: string
+  source: string
+  summary: string
+  relevance: "High" | "Moderate" | "Low"
+  year: number
+  keyPoints?: string[]
+  url?: string
+}
+
+export interface MedicalLiteratureSearch {
+  results: LiteratureResult[]
+  searchQuery: string
+  totalResults: number
+}
+
+export interface ImageAnalysisFinding {
+  finding: string
+  severity: "Critical" | "Significant" | "Mild" | "Normal"
+  location: string
+  confidence: "High" | "Moderate" | "Low"
+}
+
+export interface MedicalImageAnalysis {
+  findings: ImageAnalysisFinding[]
+  impression: string
+  recommendations: string[]
+  disclaimer: string
+  imageUrl?: string
+  analyzedAt?: Date
+}
+
+export interface ClinicalNotesProcessing {
+  formattedNotes: string
+  extractedEntities: {
+    symptoms: string[]
+    diagnoses: string[]
+    medications: string[]
+    procedures: string[]
+    labs: string[]
+  }
+  suggestedDiagnosis: string
+  suggestedActions: string[]
+}
+
+export interface DosageCalculation {
+  standardDosage: string
+  adjustedDosage: string
+  frequency: string
+  route?: string
+  duration?: string
+  warnings: string[]
+  monitoring: string[]
+  disclaimer?: string
+}
+
