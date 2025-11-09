@@ -7,17 +7,39 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 import { useParams, useSearchParams } from "next/navigation"
-import { ArrowLeft, Sparkles, Copy, Check, Send, Bot, User as UserIcon } from "lucide-react"
+import { 
+  ArrowLeft, 
+  Sparkles, 
+  Copy, 
+  Check, 
+  Send, 
+  Bot, 
+  User as UserIcon,
+  FileText,
+  Stethoscope,
+  Pill,
+  FlaskConical,
+  BookOpen,
+  Download,
+  Save,
+  AlertCircle,
+  Loader2
+} from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 const Markdown: any = ReactMarkdown
 import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
 
 type ChatMessage = { role: "user" | "assistant"; content: string }
+type ClinicalTool = "diagnosis" | "interactions" | "dosage" | "literature"
 
 export default function AISuggestionsPage() {
   const { user } = useAuth()
+  const { toast } = useToast()
   const params = useParams()
   const searchParams = useSearchParams()
   const patientId = params.id as string
@@ -26,20 +48,35 @@ export default function AISuggestionsPage() {
   const presetDiagnosis = searchParams.get("diagnosis") || ""
   const presetSymptoms = searchParams.get("symptoms")?.split(",")?.filter(Boolean) || []
 
-  // Left pane form state
+  // Form state
   const [diagnosis, setDiagnosis] = useState<string>(presetDiagnosis)
   const [symptoms, setSymptoms] = useState<string>(presetSymptoms.join(", "))
   const [condition, setCondition] = useState<string>("")
   const [notes, setNotes] = useState<string>("")
 
-  // Right pane results and chat
+  // Main results state
   const [suggestions, setSuggestions] = useState<string>("")
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string>("")
   const [copied, setCopied] = useState(false)
+  
+  // Chat state
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState<string>("")
   const chatEndRef = useRef<HTMLDivElement | null>(null)
+  
+  // Clinical tools state
+  const [activeTab, setActiveTab] = useState<string>("suggestions")
+  const [clinicalToolsData, setClinicalToolsData] = useState<Record<ClinicalTool, any>>({
+    diagnosis: null,
+    interactions: null,
+    dosage: null,
+    literature: null
+  })
+  const [toolLoading, setToolLoading] = useState<ClinicalTool | null>(null)
+  
+  // Patient context
+  const [patientContext, setPatientContext] = useState<any>(null)
 
   // Persist & load existing chat history
   useEffect(() => {
@@ -50,6 +87,10 @@ export default function AISuggestionsPage() {
         const data = await res.json()
         if (!ignore && data?.success && data?.item?.messages) {
           setMessages(data.item.messages)
+          // If there's an initial assistant message, set it as suggestions to enable chat
+          if (data.item.messages.length > 0 && data.item.messages[0].role === "assistant") {
+            setSuggestions(data.item.messages[0].content)
+          }
         }
       } catch (e) {
         console.warn("Failed to load chat history", e)
@@ -256,13 +297,13 @@ export default function AISuggestionsPage() {
               {/* Chat */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Ask follow-up questions</CardTitle>
-                  <CardDescription>Chat with the assistant based on this patient&apos;s data</CardDescription>
+                  <CardTitle>Ask Follow-Up Questions</CardTitle>
+                  <CardDescription>Get quick answers about this patient's care - ask anything!</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 max-h-[360px] overflow-y-auto pr-2">
                     {messages.length === 0 ? (
-                      <p className="text-muted-foreground text-sm">No messages yet. Generate suggestions first, then ask questions.</p>
+                      <p className="text-muted-foreground text-sm">No messages yet. Generate suggestions first, then ask questions like "What about diet?" or "Any drug interactions?"</p>
                     ) : (
                       messages.map((m, i) => (
                         <div key={i} className={`flex gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -286,7 +327,7 @@ export default function AISuggestionsPage() {
                   </div>
                   <form onSubmit={handleSendMessage} className="mt-3 flex gap-2">
                     <Input
-                      placeholder="Ask a follow-up question..."
+                      placeholder="e.g., What about dietary changes? Any alternatives to metformin?"
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
                       disabled={!suggestions}

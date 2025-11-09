@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { ObjectId } from "mongodb"
 
 import { getCollection } from "@/lib/db"
-import { generateAIPrescriptionSuggestions, generateMedicalAnalysis } from "@/lib/ai-utils"
+import { generateAIPrescriptionSuggestions, generateMedicalAnalysis, generateChatResponse } from "@/lib/ai-utils"
 
 export const runtime = "nodejs"
 
@@ -124,12 +124,93 @@ export async function POST(request: NextRequest) {
 
     const { context } = await buildPatientContext(patientId)
 
-    // If chat messages are provided, generate a conversational reply (mocked)
+    // If chat messages are provided, generate a conversational reply with full patient context
     if (Array.isArray(messages) && messages.length) {
       const lastUser = [...messages].reverse().find((m: ChatMessage) => m.role === "user")
-      const reply = `Considering the patient's profile and records, here's guidance:\n\n` +
-        (await generateMedicalAnalysis(diagnosis || condition, symptoms || [], (lastUser?.content || notes || "").slice(0, 1200))) +
-        "\n\nAlways verify dosing and cautions based on local guidelines and the patient's allergies/comorbidities."
+      const userQuestion = lastUser?.content || ""
+      
+        // Build comprehensive patient context for AI with ALL details
+        const patientContextForAI: any = {}
+      
+        // Patient demographics and personal details
+        if (context?.profile?.name) {
+          patientContextForAI.name = context.profile.name
+        }
+        if (context?.profile?.email) {
+          patientContextForAI.email = context.profile.email
+        }
+        if (context?.profile?.dateOfBirth) {
+          const age = Math.floor((Date.now() - new Date(context.profile.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+          patientContextForAI.age = age
+          patientContextForAI.dateOfBirth = new Date(context.profile.dateOfBirth).toLocaleDateString()
+        }
+        if (context?.profile?.gender) {
+          patientContextForAI.gender = context.profile.gender
+        }
+        if (context?.profile?.bloodGroup) {
+          patientContextForAI.bloodGroup = context.profile.bloodGroup
+        }
+        if (context?.profile?.allergies?.length) {
+          patientContextForAI.allergies = context.profile.allergies
+        }
+        if (context?.profile?.medicalHistory?.length) {
+          patientContextForAI.medicalHistory = context.profile.medicalHistory
+        }
+      
+        // Medical files information (AI analyses, lab results, etc.)
+        if (context?.medicalFilesInformation?.length) {
+          patientContextForAI.medicalFiles = context.medicalFilesInformation.map((file: any) => ({
+            uploadDate: file.uploadDate ? new Date(file.uploadDate).toLocaleDateString() : "N/A",
+            aiSummary: file.aiSummary || "No summary",
+            keyFindings: file.keyFindings || []
+          }))
+        }
+      
+        // Recent medical records with full details
+        if (context?.recentRecords?.length) {
+          patientContextForAI.recentRecords = context.recentRecords.map((record: any) => ({
+            date: new Date(record.date).toLocaleDateString(),
+            diagnosis: record.diagnosis || "N/A",
+            symptoms: record.symptoms || [],
+            notes: record.notes || "No notes"
+          }))
+          // Also include most recent diagnosis separately for quick reference
+          const latestRecord = context.recentRecords[0]
+          patientContextForAI.recentDiagnosis = latestRecord.diagnosis
+        }
+      
+        // Recent prescriptions with full medication details
+        if (context?.recentPrescriptions?.length) {
+          patientContextForAI.recentPrescriptions = context.recentPrescriptions.map((rx: any) => ({
+            issuedDate: new Date(rx.issuedDate).toLocaleDateString(),
+            medications: rx.medications?.map((med: any) => ({
+              name: med.name,
+              dosage: med.dosage,
+              frequency: med.frequency,
+              duration: med.duration
+            })) || [],
+            notes: rx.notes || "No notes"
+          }))
+          // Also include current medications list for quick reference
+          const currentMeds = context.recentPrescriptions[0]?.medications?.map((m: any) => 
+            `${m.name} (${m.dosage}, ${m.frequency})`
+          ) || []
+          if (currentMeds.length) {
+            patientContextForAI.currentMedications = currentMeds
+          }
+        }
+      
+      // Build conversation history (excluding system messages, last 10 exchanges)
+      const conversationHistory = messages
+        .filter((m: ChatMessage) => m.role !== "system")
+        .slice(-10)
+      
+      // Get AI response using real Gemini API
+      const reply = await generateChatResponse(
+        userQuestion, 
+        patientContextForAI,
+        conversationHistory
+      )
 
       const assistant: ChatMessage = { role: "assistant", content: reply }
       return NextResponse.json({ success: true, message: assistant })

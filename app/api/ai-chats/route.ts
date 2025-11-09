@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
     const item: any = (result as any)?.value || (await chats.findOne({ patientId, doctorId }))
     return NextResponse.json({ success: true, item })
   } catch (error) {
+    
     console.error("[API] /api/ai-chats POST error", error)
     return NextResponse.json(
       { success: false, message: error instanceof Error ? error.message : "Server error" },

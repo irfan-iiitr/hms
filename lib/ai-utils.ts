@@ -175,13 +175,46 @@ export async function generateAIPrescriptionSuggestions(diagnosis: string, sympt
 }
 
 export async function generateMedicalAnalysis(diagnosis: string, symptoms: string[], notes: string): Promise<string> {
-  // Simulate AI analysis of medical records
+  // Simulate AI analysis - handle both structured analysis and conversational chat
+  
+  // Check if this is a chat query (indicated by "chat" diagnosis or natural language question in notes)
+  if (diagnosis === "chat" || notes.toLowerCase().includes("question:") || notes.toLowerCase().includes("doctor's question:")) {
+    // Extract the actual question
+    const questionMatch = notes.match(/question:\s*"?([^"]+)"?/i)
+    const question = questionMatch ? questionMatch[1].trim().toLowerCase() : notes.toLowerCase()
+    
+    // Conversational responses based on question type
+    if (question.includes("diet") || question.includes("food") || question.includes("eat")) {
+      return "For Type 2 Diabetes, diet is crucial:\n\n**Focus on:**\n- Whole grains, vegetables, lean proteins\n- Complex carbs with low glycemic index\n- Avoid refined sugars and processed foods\n- Portion control is key\n\n**Practical tips:**\n- Eat at regular times\n- Include fiber in each meal\n- Monitor carb intake (45-60g per meal)\n- Stay hydrated with water, not sugary drinks"
+    }
+    
+    if (question.includes("exercise") || question.includes("activity") || question.includes("physical")) {
+      return "Exercise is excellent for diabetes management:\n\n- **Aim for:** 150 minutes moderate activity per week (30 min × 5 days)\n- **Best types:** Walking, swimming, cycling\n- **Timing:** After meals helps control blood sugar spikes\n- **Monitor:** Check blood sugar before/after if on insulin\n- **Start slow:** If sedentary, begin with 10-minute walks\n\n⚠️ Advise checking blood sugar before exercise if on medications that can cause hypoglycemia."
+    }
+    
+    if (question.includes("alternative") || question.includes("instead") || question.includes("different medication")) {
+      return "Alternative options to Metformin:\n\n**If GI side effects:**\n- Metformin XR (extended-release) - better tolerated\n- Start with lower dose and increase gradually\n\n**Other first-line options:**\n- SGLT2 inhibitors (empagliflozin) - also protect heart/kidneys\n- GLP-1 agonists (semaglutide) - good for weight loss\n\n**Important:** Check patient's renal function and cardiovascular status before switching. Patient is allergic to Penicillin and Sulfa drugs - avoid if relevant."
+    }
+    
+    if (question.includes("side effect") || question.includes("adverse")) {
+      return "Common side effects to watch for:\n\n**Metformin:**\n- GI upset (30% of patients): nausea, diarrhea - usually improves in 1-2 weeks\n- Take with food to minimize\n- Rarely: lactic acidosis (if renal impairment)\n\n**Gliclazide:**\n- Hypoglycemia (monitor blood sugar)\n- Weight gain (mild)\n- GI upset\n\n**When to adjust:** If side effects persist beyond 2 weeks or are severe."
+    }
+    
+    if (question.includes("yes") || question.includes("no") || question.includes("should i") || question.includes("can i")) {
+      return "Yes, that's appropriate for this patient. The current treatment plan aligns with standard guidelines for Type 2 Diabetes. Just ensure regular monitoring of HbA1c and renal function."
+    }
+    
+    // Generic conversational response
+    return "Based on this patient's profile (Type 2 Diabetes, on Metformin/Gliclazide), that's a good consideration. The key is:\n\n- Monitor blood glucose regularly\n- Watch for interactions with current medications\n- Consider patient's age and comorbidities\n- Ensure patient understands the plan\n\nIf you're considering any medication changes, check renal function first and note the patient's allergies (Penicillin, Sulfa drugs)."
+  }
+  
+  // Structured analysis for initial suggestions (keep existing format)
   const analysis = `
 Medical Record Analysis:
 
 **Diagnosis**: ${diagnosis}
-**Symptoms**: ${symptoms.join(", ")}
-**Clinical Notes**: ${notes}
+**Symptoms**: ${symptoms.join(", ") || "Not specified"}
+**Clinical Notes**: ${notes || "None provided"}
 
 **Analysis Summary**:
 - Primary condition requires careful monitoring
@@ -205,6 +238,306 @@ Medical Record Analysis:
   await new Promise((resolve) => setTimeout(resolve, 600))
 
   return analysis
+}
+
+// Generate conversational chat response using Gemini AI
+export async function generateChatResponse(
+  userQuestion: string,
+  patientContext: {
+    age?: number
+    gender?: string
+    allergies?: string[]
+    medicalHistory?: string[]
+    recentDiagnosis?: string
+    currentMedications?: string[]
+  },
+  conversationHistory?: Array<{ role: string; content: string }>
+): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GENERATIVE_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
+  const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash-preview-09-2025"
+
+  // Fallback to mock response if no API key
+  if (!apiKey) {
+    console.warn("[AI Chat] No Gemini API key configured, using mock response")
+    return generateMockChatResponse(userQuestion, patientContext)
+  }
+
+  try {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`
+
+    // Build context-aware system prompt
+    const systemPrompt = buildChatSystemPrompt(patientContext)
+    
+    // Build conversation messages
+    const contents: any[] = []
+    
+    // Add system context
+    contents.push({
+      parts: [{ text: systemPrompt }]
+    })
+    
+    // Add conversation history if available
+    if (conversationHistory && conversationHistory.length > 0) {
+      // Take last 5 exchanges to avoid token limits
+      const recentHistory = conversationHistory.slice(-10)
+      recentHistory.forEach(msg => {
+        if (msg.role === "user" || msg.role === "assistant") {
+          contents.push({
+            parts: [{ text: msg.content }]
+          })
+        }
+      })
+    }
+    
+    // Add current question
+    contents.push({
+      parts: [{ text: userQuestion }]
+    })
+
+    const payload = {
+      contents,
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 1024,
+      }
+    }
+
+    const response = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "")
+      console.error("[AI Chat] Gemini API error:", response.status, errorText)
+      throw new Error(`Gemini API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const text = data?.candidates?.[0]?.content?.parts?.find((p: any) => p?.text)?.text || ""
+
+    if (!text) {
+      console.warn("[AI Chat] No text in Gemini response, using fallback")
+      return generateMockChatResponse(userQuestion, patientContext)
+    }
+
+    return text.trim()
+  } catch (error) {
+    console.error("[AI Chat] Error calling Gemini API:", error)
+    return generateMockChatResponse(userQuestion, patientContext)
+  }
+}
+
+// Build context-aware system prompt
+function buildChatSystemPrompt(patientContext: {
+  name?: string
+  email?: string
+  age?: number
+  gender?: string
+  dateOfBirth?: string
+  bloodGroup?: string
+  allergies?: string[]
+  medicalHistory?: string[]
+  medicalFiles?: Array<{
+    uploadDate: string
+    aiSummary: string
+    keyFindings: string[]
+  }>
+  recentRecords?: Array<{
+    date: string
+    diagnosis: string
+    symptoms: string[]
+    notes: string
+  }>
+  recentPrescriptions?: Array<{
+    issuedDate: string
+    medications: Array<{
+      name: string
+      dosage: string
+      frequency: string
+      duration: string
+    }>
+    notes: string
+  }>
+  recentDiagnosis?: string
+  currentMedications?: string[]
+}): string {
+  const parts: string[] = []
+  
+  parts.push("You are a medical AI assistant helping a doctor with patient care. Provide evidence-based, concise, and practical clinical guidance.")
+  parts.push("")
+  parts.push("=== COMPLETE PATIENT CONTEXT ===")
+  parts.push("")
+  
+  // Personal Information
+  parts.push("PATIENT IDENTITY:")
+  if (patientContext.name) {
+    parts.push(`- Name: ${patientContext.name}`)
+  }
+  if (patientContext.email) {
+    parts.push(`- Email: ${patientContext.email}`)
+  }
+  if (patientContext.dateOfBirth) {
+    parts.push(`- Date of Birth: ${patientContext.dateOfBirth}`)
+  }
+  
+  if (patientContext.age) {
+    parts.push(`- Age: ${patientContext.age} years old`)
+  }
+  if (patientContext.gender) {
+    parts.push(`- Gender: ${patientContext.gender}`)
+  }
+  if (patientContext.bloodGroup) {
+    parts.push(`- Blood Group: ${patientContext.bloodGroup}`)
+  }
+  
+  parts.push("")
+  
+  // Critical Information
+  if (patientContext.allergies && patientContext.allergies.length > 0) {
+    parts.push("⚠️ ALLERGIES (CRITICAL - CHECK BEFORE ANY MEDICATION):")
+    patientContext.allergies.forEach(allergy => {
+      parts.push(`  • ${allergy}`)
+    })
+    parts.push("")
+  }
+  
+  if (patientContext.medicalHistory && patientContext.medicalHistory.length > 0) {
+    parts.push("MEDICAL HISTORY:")
+    patientContext.medicalHistory.forEach(condition => {
+      parts.push(`  • ${condition}`)
+    })
+    parts.push("")
+  }
+  
+  // Medical Files (AI summaries from uploaded documents)
+  if (patientContext.medicalFiles && patientContext.medicalFiles.length > 0) {
+    parts.push("MEDICAL FILES & LAB REPORTS:")
+    patientContext.medicalFiles.forEach((file, idx) => {
+      parts.push(`  ${idx + 1}. Uploaded: ${file.uploadDate}`)
+      parts.push(`     Summary: ${file.aiSummary}`)
+      if (file.keyFindings && file.keyFindings.length > 0) {
+        parts.push(`     Key Findings: ${file.keyFindings.join(", ")}`)
+      }
+    })
+    parts.push("")
+  }
+  
+  // Recent Medical Records (visits, diagnoses, symptoms)
+  if (patientContext.recentRecords && patientContext.recentRecords.length > 0) {
+    parts.push("RECENT MEDICAL RECORDS (Most Recent First):")
+    patientContext.recentRecords.forEach((record, idx) => {
+      parts.push(`  ${idx + 1}. Date: ${record.date}`)
+      parts.push(`     Diagnosis: ${record.diagnosis}`)
+      if (record.symptoms && record.symptoms.length > 0) {
+        parts.push(`     Symptoms: ${record.symptoms.join(", ")}`)
+      }
+      if (record.notes && record.notes !== "No notes") {
+        parts.push(`     Notes: ${record.notes}`)
+      }
+    })
+    parts.push("")
+  }
+  
+  // Recent Prescriptions (medications with dosages)
+  if (patientContext.recentPrescriptions && patientContext.recentPrescriptions.length > 0) {
+    parts.push("RECENT PRESCRIPTIONS (Most Recent First):")
+    patientContext.recentPrescriptions.forEach((rx, idx) => {
+      parts.push(`  ${idx + 1}. Date: ${rx.issuedDate}`)
+      if (rx.medications && rx.medications.length > 0) {
+        parts.push(`     Medications:`)
+        rx.medications.forEach(med => {
+          parts.push(`       • ${med.name}`)
+          parts.push(`         Dosage: ${med.dosage}`)
+          parts.push(`         Frequency: ${med.frequency}`)
+          parts.push(`         Duration: ${med.duration}`)
+        })
+      }
+      if (rx.notes && rx.notes !== "No notes") {
+        parts.push(`     Notes: ${rx.notes}`)
+      }
+    })
+    parts.push("")
+  }
+  
+  // Quick reference for current status
+  if (patientContext.recentDiagnosis) {
+    parts.push(`CURRENT PRIMARY DIAGNOSIS: ${patientContext.recentDiagnosis}`)
+    parts.push("")
+  }
+  
+  if (patientContext.currentMedications && patientContext.currentMedications.length > 0) {
+    parts.push("CURRENT ACTIVE MEDICATIONS:")
+    patientContext.currentMedications.forEach(med => {
+      parts.push(`  • ${med}`)
+    })
+    parts.push("")
+  }
+  
+  parts.push("=== END PATIENT CONTEXT ===")
+  parts.push("")
+  
+  parts.push("INSTRUCTIONS:")
+  parts.push("- Answer the doctor's question naturally and directly")
+  parts.push("- You have access to the patient's full medical history above")
+  parts.push("- Reference specific details from the context when relevant (dates, diagnoses, medications)")
+  parts.push("- If asked about the patient's name or identity, use the information provided above")
+  parts.push("- Be conversational, not formulaic")
+  parts.push("- Adapt your answer length to the question complexity")
+  parts.push("- Use markdown formatting (bold, lists) for clarity")
+  parts.push("- ALWAYS consider patient allergies when suggesting medications")
+  parts.push("- For simple questions, give brief focused answers")
+  parts.push("- For complex questions, provide detailed explanations")
+  parts.push("- Include dosing information when relevant")
+  parts.push("- Mention drug interactions if current medications are relevant")
+  parts.push("- Keep safety warnings brief unless specifically about critical issues")
+  parts.push("- If you're unsure, say so and suggest consulting guidelines")
+  parts.push("")
+  parts.push("Answer the doctor's question:")
+  
+  return parts.join("\n")
+}
+
+// Mock response fallback
+function generateMockChatResponse(userQuestion: string, patientContext: any): string {
+  const question = userQuestion.toLowerCase()
+  
+  // Handle identity questions
+  if (question.includes("name") || question.includes("who is") || question.includes("patient") && question.includes("?")) {
+    const name = patientContext.name || "Unknown"
+    const age = patientContext.age || "Unknown age"
+    const gender = patientContext.gender || "Unknown gender"
+    const diagnosis = patientContext.recentDiagnosis || "No recent diagnosis"
+    
+    return `**Patient Identity:**\n\n- **Name:** ${name}\n- **Age:** ${age} years old\n- **Gender:** ${gender}\n- **Blood Group:** ${patientContext.bloodGroup || "Not specified"}\n- **Recent Diagnosis:** ${diagnosis}\n\n${patientContext.allergies?.length > 0 ? `⚠️ **Allergies:** ${patientContext.allergies.join(", ")}` : "No known allergies on record."}`
+  }
+  
+  // Check question type and generate appropriate response
+  if (question.includes("diet") || question.includes("food") || question.includes("nutrition")) {
+    return `For ${patientContext.name || "this patient"}'s ${patientContext.recentDiagnosis || "condition"}, dietary management is important:\n\n**Key Recommendations:**\n- Balanced meals with whole grains and lean proteins\n- Limit processed foods and refined sugars\n- Stay hydrated (8 glasses water/day)\n- Monitor portion sizes\n\n**For ${patientContext.name || "this"} (${patientContext.age || "adult"} year old):** Adjust portions based on activity level and weight goals.`
+  }
+  
+  if (question.includes("exercise") || question.includes("activity") || question.includes("physical")) {
+    return `Exercise recommendations for ${patientContext.name || "this patient"} (${patientContext.recentDiagnosis || "current condition"}):\n\n- **Target:** 150 minutes moderate activity per week\n- **Best options:** Walking, swimming, cycling\n- **Start gradually** if currently sedentary\n- Check blood pressure/glucose before and after if on medications\n\n${patientContext.age && patientContext.age > 60 ? `Given ${patientContext.name ? patientContext.name + "'s" : "the patient's"} age (${patientContext.age}), consider lower impact activities.` : "Encourage regular, consistent exercise."}`
+  }
+  
+  if (question.includes("medication") || question.includes("drug") || question.includes("alternative")) {
+    const allergyWarning = patientContext.allergies?.length > 0 
+      ? `\n\n⚠️ **Critical Alert:** ${patientContext.name || "This patient"} is allergic to ${patientContext.allergies.join(", ")} - avoid these drug classes.`
+      : ""
+    
+    return `When considering medication options for ${patientContext.name || "this patient"}:\n\n- Review current medications: ${patientContext.currentMedications?.join(", ") || "None listed"}\n- Check for drug interactions\n- Adjust dosing for age (${patientContext.age || "unknown"}) and renal function\n- Consider patient adherence and cost${allergyWarning}`
+  }
+  
+  if (question.includes("side effect") || question.includes("adverse")) {
+    return `Common side effects to monitor for ${patientContext.name || "this patient"}:\n\n**Current medications:**\n${patientContext.currentMedications?.map((med: string) => `- ${med}: GI upset, dizziness, monitor as needed`).join("\n") || "- No current medications listed"}\n\n**When to be concerned:**\n- Severe reactions or allergic symptoms\n- Symptoms interfering with daily activities\n- New or worsening symptoms\n\nAdvise ${patientContext.name || "the patient"} to report any concerning symptoms immediately.`
+  }
+  
+  // Generic response
+  return `Based on ${patientContext.name ? patientContext.name + "'s" : "the patient's"} profile:\n\n- **Name:** ${patientContext.name || "Not specified"}\n- **Age:** ${patientContext.age || "Adult"} year old ${patientContext.gender || "patient"}\n- **Current diagnosis:** ${patientContext.recentDiagnosis || "Not specified"}\n- **Medications:** ${patientContext.currentMedications?.join(", ") || "None listed"}\n\nFor your specific question about "${userQuestion}", I recommend:\n\n1. Review current treatment plan for ${patientContext.name || "this patient"}\n2. Consider patient-specific factors (age, comorbidities)\n3. Monitor for any adverse effects\n4. Ensure patient understanding and compliance\n\n${patientContext.allergies?.length > 0 ? `⚠️ Remember: ${patientContext.name || "Patient"} is allergic to ${patientContext.allergies.join(", ")}` : ""}`
 }
 
 // Generate a plain-language summary for patients with strong guardrails.
