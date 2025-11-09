@@ -247,7 +247,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -269,24 +269,28 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
             {/* Differential Diagnosis */}
             <TabsContent value="differential" className="space-y-4">
-              <div className="space-y-3">
-                <label className="text-sm font-medium">Symptoms (comma-separated)</label>
-                <Input
-                  placeholder="e.g., Fever, Cough, Fatigue"
-                  value={symptoms}
-                  onChange={(e) => setSymptoms(e.target.value)}
-                />
-                <Button onClick={handleDifferentialDiagnosis} disabled={ddLoading} className="w-full">
-                  {ddLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    "Generate Differential Diagnosis"
-                  )}
-                </Button>
-              </div>
+              <Card className="bg-muted/30">
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium">Symptoms (comma-separated)</label>
+                    <Input
+                      placeholder="e.g., Fever, Cough, Fatigue"
+                      value={symptoms}
+                      onChange={(e) => setSymptoms(e.target.value)}
+                    />
+                    <Button onClick={handleDifferentialDiagnosis} disabled={ddLoading} className="w-full">
+                      {ddLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        "Generate Differential Diagnosis"
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
               {ddResult && (
                 <div className="space-y-4 mt-4">
@@ -364,24 +368,28 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
             {/* Drug Interactions */}
             <TabsContent value="interactions" className="space-y-4">
-              <div className="space-y-3">
-                <label className="text-sm font-medium">Medications (comma-separated)</label>
-                <Input
-                  placeholder="e.g., Aspirin, Warfarin, Lisinopril"
-                  value={medications}
-                  onChange={(e) => setMedications(e.target.value)}
-                />
-                <Button onClick={handleDrugInteraction} disabled={diLoading} className="w-full">
-                  {diLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Checking...
-                    </>
-                  ) : (
-                    "Check Drug Interactions"
-                  )}
-                </Button>
-              </div>
+              <Card className="bg-muted/30">
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium">Medications (comma-separated)</label>
+                    <Input
+                      placeholder="e.g., Aspirin, Warfarin, Lisinopril"
+                      value={medications}
+                      onChange={(e) => setMedications(e.target.value)}
+                    />
+                    <Button onClick={handleDrugInteraction} disabled={diLoading} className="w-full">
+                      {diLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Checking...
+                        </>
+                      ) : (
+                        "Check Drug Interactions"
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
               {diResult && (
                 <div className="space-y-4 mt-4">
@@ -465,47 +473,51 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
             {/* Literature Search */}
             <TabsContent value="literature" className="space-y-4">
-              <div className="space-y-3">
-                <label className="text-sm font-medium">Search Query</label>
-                <Input
-                  placeholder="e.g., Treatment for type 2 diabetes"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <Button
-                    variant={searchType === "research" ? "default" : "outline"}
-                    onClick={() => setSearchType("research")}
-                    size="sm"
-                  >
-                    Research
-                  </Button>
-                  <Button
-                    variant={searchType === "guidelines" ? "default" : "outline"}
-                    onClick={() => setSearchType("guidelines")}
-                    size="sm"
-                  >
-                    Guidelines
-                  </Button>
-                  <Button
-                    variant={searchType === "trials" ? "default" : "outline"}
-                    onClick={() => setSearchType("trials")}
-                    size="sm"
-                  >
-                    Trials
-                  </Button>
-                </div>
-                <Button onClick={handleLiteratureSearch} disabled={litLoading} className="w-full">
-                  {litLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Searching...
-                    </>
-                  ) : (
-                    "Search Literature"
-                  )}
-                </Button>
-              </div>
+              <Card className="bg-muted/30">
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium">Search Query</label>
+                    <Input
+                      placeholder="e.g., Treatment for type 2 diabetes"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        variant={searchType === "research" ? "default" : "outline"}
+                        onClick={() => setSearchType("research")}
+                        size="sm"
+                      >
+                        Research
+                      </Button>
+                      <Button
+                        variant={searchType === "guidelines" ? "default" : "outline"}
+                        onClick={() => setSearchType("guidelines")}
+                        size="sm"
+                      >
+                        Guidelines
+                      </Button>
+                      <Button
+                        variant={searchType === "trials" ? "default" : "outline"}
+                        onClick={() => setSearchType("trials")}
+                        size="sm"
+                      >
+                        Trials
+                      </Button>
+                    </div>
+                    <Button onClick={handleLiteratureSearch} disabled={litLoading} className="w-full">
+                      {litLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Searching...
+                        </>
+                      ) : (
+                        "Search Literature"
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
               {litResult && (
                 <div className="space-y-3 mt-4">
@@ -543,54 +555,58 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
             {/* Dosage Calculator */}
             <TabsContent value="dosage" className="space-y-4">
-              <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium">Medication Name</label>
-                  <Input
-                    placeholder="e.g., Amoxicillin"
-                    value={dosageMed}
-                    onChange={(e) => setDosageMed(e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium">Age (years)</label>
-                    <Input
-                      type="number"
-                      placeholder="Age"
-                      value={dosageAge}
-                      onChange={(e) => setDosageAge(e.target.value)}
-                    />
+              <Card className="bg-muted/30">
+                <CardContent className="pt-6">
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium">Medication Name</label>
+                      <Input
+                        placeholder="e.g., Amoxicillin"
+                        value={dosageMed}
+                        onChange={(e) => setDosageMed(e.target.value)}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-sm font-medium">Age (years)</label>
+                        <Input
+                          type="number"
+                          placeholder="Age"
+                          value={dosageAge}
+                          onChange={(e) => setDosageAge(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium">Weight (kg)</label>
+                        <Input
+                          type="number"
+                          placeholder="Weight"
+                          value={dosageWeight}
+                          onChange={(e) => setDosageWeight(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Indication</label>
+                      <Input
+                        placeholder="e.g., Bacterial infection"
+                        value={dosageIndication}
+                        onChange={(e) => setDosageIndication(e.target.value)}
+                      />
+                    </div>
+                    <Button onClick={handleDosageCalculation} disabled={dosageLoading} className="w-full">
+                      {dosageLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Calculating...
+                        </>
+                      ) : (
+                        "Calculate Dosage"
+                      )}
+                    </Button>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium">Weight (kg)</label>
-                    <Input
-                      type="number"
-                      placeholder="Weight"
-                      value={dosageWeight}
-                      onChange={(e) => setDosageWeight(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Indication</label>
-                  <Input
-                    placeholder="e.g., Bacterial infection"
-                    value={dosageIndication}
-                    onChange={(e) => setDosageIndication(e.target.value)}
-                  />
-                </div>
-                <Button onClick={handleDosageCalculation} disabled={dosageLoading} className="w-full">
-                  {dosageLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Calculating...
-                    </>
-                  ) : (
-                    "Calculate Dosage"
-                  )}
-                </Button>
-              </div>
+                </CardContent>
+              </Card>
 
               {dosageResult && (
                 <div className="space-y-3 mt-4">
