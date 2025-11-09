@@ -1,9 +1,10 @@
 import { MongoClient, type Collection, type Document } from "mongodb"
 
-const uri =
-  process.env.MONGODB_URI ||
-  "mongodb+srv://shobhitcodes247_db_user:FPQ4H6UsHJYeJ38Y@cluster0.xwazyvz.mongodb.net/?appName=Cluster0"
+const uri = process.env.MONGODB_URI || ""
 
+if (!uri) {
+  throw new Error("Please define the MONGODB_URI environment variable inside .env")
+}
 declare global {
   // eslint-disable-next-line no-var
   var _mongoClientPromise: Promise<MongoClient> | undefined

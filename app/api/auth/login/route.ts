@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
         role: user.role,
         name: user.fullName,
         id: user._id?.toString?.(),
+        availableSlots: user.availableSlots || [],
       },
     };
     

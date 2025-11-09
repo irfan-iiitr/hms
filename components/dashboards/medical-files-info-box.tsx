@@ -42,14 +42,52 @@ function FileDetails({ info, index }: { info: MedicalFileInfo; index: number }) 
   return (
     <div className="border rounded-md p-3 bg-muted/30">
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs text-muted-foreground">
-          Uploaded: {info.uploadedAt ? new Date(info.uploadedAt).toLocaleString() : "—"}
+        <div className="text-xs text-muted-foreground space-y-0.5">
+          <div>Uploaded: {info.uploadedAt ? new Date(info.uploadedAt).toLocaleString() : "—"}</div>
+          {info.category && (
+            <div className="inline-block rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide">
+              {info.category.replace(/_/g, " ")}
+            </div>
+          )}
         </div>
   <Button variant="outline" size="sm" className="h-6 px-2 text-[10px]" onClick={() => setShowRaw((s) => !s)}>
           {showRaw ? "Hide JSON" : "Raw JSON"}
         </Button>
       </div>
       <h3 className="font-semibold text-sm mb-2">{info.summary || "No summary"}</h3>
+
+      {/* Preview asset if available */}
+      {info.url && (
+        <div className="mb-3">
+          {info.mimeType?.startsWith("image") ? (
+            <a
+              href={info.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full border rounded overflow-hidden group"
+            >
+              <img
+                src={info.thumbnailUrl || info.url}
+                alt={info.originalFileName || "medical file"}
+                className="w-full h-48 object-cover group-hover:opacity-90 transition-opacity"
+                loading="lazy"
+              />
+            </a>
+          ) : (
+            <div className="flex items-center justify-between text-xs bg-muted/40 rounded p-2">
+              <span>{info.originalFileName || info.publicId || "File"}</span>
+              <a
+                href={info.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-foreground"
+              >
+                Open
+              </a>
+            </div>
+          )}
+        </div>
+      )}
 
       {keyValues.length > 0 && (
         <div className="mb-3">

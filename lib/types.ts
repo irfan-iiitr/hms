@@ -19,9 +19,25 @@ export interface User {
 }
 
 export interface MedicalFileInfo {
+  // AI-extracted summary of the file contents
   summary: string
+  // Arbitrary structured details extracted by AI
   details: any
-  uploadedAt: Date
+  // When the file was uploaded
+  uploadedAt: Date | string
+  // Cloud storage metadata (optional for backward compatibility)
+  url?: string // secure URL to the uploaded asset
+  publicId?: string // Cloudinary public_id
+  thumbnailUrl?: string // optional thumbnail/preview URL
+  mimeType?: string
+  bytes?: number
+  format?: string // e.g., jpg, png, pdf, docx
+  width?: number
+  height?: number
+  pageCount?: number
+  originalFileName?: string
+  // Basic categorization to help filtering in UI
+  category?: "lab_result" | "prescription" | "imaging" | "insurance" | "referral" | "other"
 }
 
 export interface PatientProfile extends User {

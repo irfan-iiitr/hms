@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { getCollection } from "@/lib/db"
 import { toObjectId } from "@/lib/objectid"
 import { sendToGeminiMedicalFile } from "@/lib/ai-utils"
+import { uploadBuffer } from "@/lib/cloudinary"
+import type { MedicalFileInfo } from "@/lib/types"
 
 export const runtime = "nodejs" // Set to nodejs for Next.js Node runtime compatibility
 
@@ -15,6 +17,7 @@ export async function POST(req: NextRequest) {
 
   const file = formData.get("file") as File | null
   const patientId = formData.get("patientId") as string | null
+  const category = (formData.get("category") as string | null) || "other"
   if (!file || !patientId) {
     return NextResponse.json({ success: false, message: "Missing file or patientId" }, { status: 400 })
   }
@@ -24,12 +27,43 @@ export async function POST(req: NextRequest) {
   }
 
 
-  console.log("[medical-files] Processing file:", { 
-    fileName: (file as any).name, 
-    fileType: (file as any).type, 
+  console.log("[medical-files] Processing file:", {
+    fileName: (file as any).name,
+    fileType: (file as any).type,
     fileSize: (file as any).size,
-    patientId: patientObjectId.toString() 
+    category,
+    patientId: patientObjectId.toString(),
   })
+
+  // Attempt Cloudinary upload first (if configured)
+  let cloudinaryMeta: Partial<MedicalFileInfo> = {}
+  try {
+    if (process.env.CLOUDINARY_URL) {
+      const buffer = Buffer.from(await (file as any).arrayBuffer())
+      const uploadRes = await uploadBuffer(buffer, { folder: "medical-files" })
+      cloudinaryMeta = {
+        url: uploadRes.secure_url,
+        publicId: uploadRes.public_id,
+        thumbnailUrl: (uploadRes as any).thumbnailUrl,
+        mimeType: uploadRes.resource_type === "image" ? (file as any).type : uploadRes.resource_type,
+        bytes: uploadRes.bytes,
+        format: uploadRes.format,
+        width: uploadRes.width,
+        height: uploadRes.height,
+        originalFileName: (file as any).name,
+        category: category as any,
+      }
+      console.log("[medical-files] Cloudinary upload success:", {
+        publicId: uploadRes.public_id,
+        bytes: uploadRes.bytes,
+        format: uploadRes.format,
+      })
+    } else {
+      console.warn("[medical-files] CLOUDINARY_URL not configured; skipping cloud upload")
+    }
+  } catch (err) {
+    console.error("[medical-files] Cloudinary upload failed; continuing without cloud metadata", err)
+  }
 
   // 1. Send file to Gemini for extraction
   const geminiResult = await sendToGeminiMedicalFile(file)
@@ -40,10 +74,12 @@ export async function POST(req: NextRequest) {
   })
 
   // 2. Build the saved item
-  const savedItem = {
+  const savedItem: MedicalFileInfo = {
     summary: geminiResult.summary,
     details: geminiResult.details,
     uploadedAt: new Date(),
+    // Spread cloud metadata if present
+    ...cloudinaryMeta,
   }
   console.log("[medical-files] Item to save:", JSON.stringify(savedItem, null, 2))
 

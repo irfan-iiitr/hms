@@ -112,6 +112,8 @@ export default function PatientDashboard() {
     setUploadError(null)
   }
 
+  const [fileCategory, setFileCategory] = useState<string>("other")
+
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedFile) {
@@ -124,6 +126,7 @@ export default function PatientDashboard() {
       const formData = new FormData()
       formData.append("file", selectedFile)
       formData.append("patientId", user?.id || (user as any)?._id?.toString?.() || "")
+      formData.append("category", fileCategory)
       const res = await fetch("/api/medical-files", {
         method: "POST",
         body: formData,
@@ -413,6 +416,22 @@ export default function PatientDashboard() {
                   className="block w-full text-sm"
                   disabled={uploading}
                 />
+                <div>
+                  <label className="text-xs font-medium block mb-1">Category</label>
+                  <select
+                    value={fileCategory}
+                    onChange={(e) => setFileCategory(e.target.value)}
+                    className="w-full border rounded px-2 py-1 text-sm bg-background"
+                    disabled={uploading}
+                  >
+                    <option value="lab_result">Lab Result</option>
+                    <option value="imaging">Imaging / Scan</option>
+                    <option value="prescription">Prescription</option>
+                    <option value="referral">Referral</option>
+                    <option value="insurance">Insurance</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
                 {selectedFile && (
                   <div className="text-xs mt-1">Selected: {selectedFile.name}</div>
                 )}

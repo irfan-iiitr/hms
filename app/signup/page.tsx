@@ -46,7 +46,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+    <main className="min-h-screen flex items-center justify-center bg-linear-to-br from-background to-muted p-4">
       <div className="w-full max-w-md">
         <Card className="border-2 border-primary/20">
           <CardHeader className="space-y-2">

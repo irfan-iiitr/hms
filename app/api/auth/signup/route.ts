@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
         fullName,
         role,
         id: result.insertedId.toString(),
+        availableSlots: [],
       },
     };
     
