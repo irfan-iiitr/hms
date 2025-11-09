@@ -14,7 +14,7 @@ import {
 } from "@/lib/api"
 import { fetchUserById } from "@/lib/get-user"
 import type { MedicalRecord, Appointment, User, Prescription } from "@/lib/types"
-import { Stethoscope, Calendar, Users, LogOut, Pill } from "lucide-react"
+import { Stethoscope, Calendar, Users, LogOut, Pill, BarChart3 } from "lucide-react"
 import Link from "next/link"
 
 
@@ -145,10 +145,18 @@ export default function DoctorDashboard() {
             <h1 className="text-4xl font-bold text-balance">{user?.name}</h1>
             <p className="text-muted-foreground mt-2">Manage patients and prescriptions</p>
           </div>
-          <Button onClick={handleLogout} variant="outline" size="lg" className="gap-2 bg-transparent">
-            <LogOut className="w-4 h-4" />
-            Logout
-          </Button>
+          <div className="flex gap-2">
+            <Link href="/dashboard/doctor/analytics">
+              <Button variant="outline" size="lg" className="gap-2 bg-transparent">
+                <BarChart3 className="w-4 h-4" />
+                Analytics
+              </Button>
+            </Link>
+            <Button onClick={handleLogout} variant="outline" size="lg" className="gap-2 bg-transparent">
+              <LogOut className="w-4 h-4" />
+              Logout
+            </Button>
+          </div>
         </div>
 
         {/* Doctor Availability Slots */}

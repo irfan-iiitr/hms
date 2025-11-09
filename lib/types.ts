@@ -166,3 +166,83 @@ export interface AppointmentPrepPack {
   documentsNeeded: string[]
   summary: string
 }
+
+// Analytics types
+export interface PatientStats {
+  daily: number
+  weekly: number
+  monthly: number
+  newPatientsMonth: number
+  returningPatientsMonth: number
+  totalPatients: number
+}
+
+export interface Demographics {
+  gender: Record<string, number>
+  ageGroups: Record<string, number>
+}
+
+export interface AppointmentAnalytics {
+  total: number
+  scheduled: number
+  completed: number
+  cancelled: number
+  completionRate: number
+  cancellationRate: number
+  noShowRate: number
+  averageDuration: number
+  peakHour: string
+  peakDay: string
+  hourlyDistribution: number[]
+  dailyDistribution: Record<string, number>
+  cancellationReasons: Record<string, number>
+}
+
+export interface MedicalInsights {
+  topDiagnoses: Array<{ diagnosis: string; count: number }>
+  topMedications: Array<{ medication: string; count: number }>
+  topSymptoms: Array<{ symptom: string; count: number }>
+  seasonalTrends: Array<{ month: string; totalDiagnoses: number; topDiagnosis: string }>
+  totalRecords: number
+  totalPrescriptions: number
+}
+
+export interface PerformanceMetrics {
+  consultationsPerDay: number
+  recordsPerAppointment: number
+  prescriptionsPerAppointment: number
+  averageResponseTime: string
+  patientSatisfaction: number
+  totalAppointmentsMonth: number
+  totalRecordsMonth: number
+  totalPrescriptionsMonth: number
+}
+
+export interface TrendData {
+  value: number
+  trend: "up" | "down" | "stable"
+  percentage: number
+}
+
+export interface DoctorAnalytics {
+  patientStats: PatientStats
+  demographics: Demographics
+  appointmentAnalytics: AppointmentAnalytics
+  medicalInsights: MedicalInsights
+  performanceMetrics: PerformanceMetrics
+  trends: Record<string, TrendData>
+  metadata: {
+    doctorId: string
+    generatedAt: string
+    dataRange: {
+      from: string
+      to: string
+    }
+    totalDataPoints: {
+      patients: number
+      appointments: number
+      records: number
+      prescriptions: number
+    }
+  }
+}
