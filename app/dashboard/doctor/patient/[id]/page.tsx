@@ -23,6 +23,7 @@ import { VoiceRecorder } from "@/components/voice-recorder"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { FullPageLoader } from "@/components/ui/full-page-loader"
 
 export default function PatientDetailPage() {
   const { user } = useAuth()
@@ -51,14 +52,23 @@ export default function PatientDetailPage() {
   const [rxNotes, setRxNotes] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [isLoadingPatient, setIsLoadingPatient] = useState(true)
+  const [patientNotFound, setPatientNotFound] = useState(false)
 
   useEffect(() => {
     let mounted = true
     console.log("[DoctorPatientPage] Loading patient & records", { patientId })
     // Fetch single patient with full details (including medicalFilesInformation)
+    setIsLoadingPatient(true)
+    setPatientNotFound(false)
     fetch(`/api/users/${encodeURIComponent(patientId)}`)
       .then(async (res) => {
         if (!mounted) return
+        if (res.status === 404) {
+          setPatient(null)
+          setPatientNotFound(true)
+          return
+        }
         if (!res.ok) throw new Error(`Failed to fetch user ${res.status}`)
         const data = await res.json()
         if (data?.success && data?.user) {
@@ -66,6 +76,9 @@ export default function PatientDetailPage() {
         }
       })
       .catch((err) => console.error("[DoctorPatientPage] Failed to load patient", err))
+      .finally(() => {
+        if (mounted) setIsLoadingPatient(false)
+      })
 
     fetchMedicalRecordsByPatient(patientId)
       .then((items) => {
@@ -231,11 +244,35 @@ export default function PatientDetailPage() {
     }
   }
 
-  if (!patient) {
+  if (isLoadingPatient) {
+    return (
+      <ProtectedRoute>
+        <FullPageLoader message="Loading patient..." />
+      </ProtectedRoute>
+    )
+  }
+
+  if (!patient && patientNotFound) {
     return (
       <ProtectedRoute>
         <main className="min-h-screen bg-linear-to-br from-background to-muted flex items-center justify-center">
-          <p className="text-muted-foreground">Patient not found</p>
+          <div className="text-center space-y-3">
+            <div className="mx-auto h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+              <AlertTriangle className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h2 className="text-xl font-semibold">Patient not found</h2>
+            <p className="text-muted-foreground text-sm max-w-sm">
+              The patient record you're looking for doesn't exist or may have been removed.
+            </p>
+            <div className="pt-2">
+              <Link href="/dashboard/doctor/patients">
+                <Button variant="outline" className="gap-2">
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to patients
+                </Button>
+              </Link>
+            </div>
+          </div>
         </main>
       </ProtectedRoute>
     )
@@ -253,8 +290,8 @@ export default function PatientDetailPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-balance">{patient.name}</h1>
-              <p className="text-muted-foreground">{patient.email}</p>
+              <h1 className="text-3xl font-bold text-balance">{patient?.name || ""}</h1>
+              <p className="text-muted-foreground">{patient?.email || ""}</p>
             </div>
           </div>
 
