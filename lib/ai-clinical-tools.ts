@@ -4,6 +4,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { logger } from "@/lib/logger"
 
 // Initialize Gemini AI
 const getGeminiAPI = () => {
@@ -22,6 +23,184 @@ const getGeminiAPI = () => {
 }
 
 const MODEL_NAME = "gemini-2.5-flash"
+
+type DosageWebSearchResult = {
+  companyName: string
+  dosage: string
+  orderLink: string
+  sourceTitle?: string
+  sourceUrl?: string
+}
+
+const DOSAGE_PLACEHOLDER_TERMS = ["consult", "requires clinical", "as per guidelines", "unknown", "n/a"]
+
+function hasConcreteDosage(
+  result: { standardDosage?: string; adjustedDosage?: string; frequency?: string } | null | undefined
+) {
+  if (!result) return false
+
+  const fields = [result.standardDosage, result.adjustedDosage, result.frequency].filter(Boolean) as string[]
+  if (fields.length === 0) return false
+
+  return fields.some((value) => {
+    const normalized = value.toLowerCase()
+    return !DOSAGE_PLACEHOLDER_TERMS.some((term) => normalized.includes(term))
+  })
+}
+
+async function runSerperSearch(query: string) {
+  const apiKey = process.env.SERPER_API_KEY
+  if (!apiKey) {
+    logger.warn("[Dosage Web Search] SERPER_API_KEY missing; skipping search")
+    return null
+  }
+
+  logger.info("[Dosage Web Search] Starting Serper search", {
+    hasApiKey: Boolean(apiKey),
+    query,
+  })
+
+  const response = await fetch("https://google.serper.dev/search", {
+    method: "POST",
+    headers: {
+      "X-API-KEY": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      q: query,
+      num: 10,
+      gl: "in",
+      hl: "en",
+      location: "India",
+    }),
+  })
+
+  if (!response.ok) {
+    logger.error("[Dosage Web Search] Serper request failed", undefined, {
+      status: response.status,
+      statusText: response.statusText,
+    })
+    throw new Error(`Serper search failed with status ${response.status}`)
+  }
+
+  const json = await response.json()
+  logger.info("[Dosage Web Search] Serper response received", {
+    organicCount: Array.isArray(json?.organic) ? json.organic.length : 0,
+  })
+  return json
+}
+
+function extractDosageWebResultsFallback(serperData: any): DosageWebSearchResult[] {
+  const organic = Array.isArray(serperData?.organic) ? serperData.organic : []
+  const extracted = organic
+    .map((item: any) => {
+      const snippet = String(item?.snippet || "")
+      const title = String(item?.title || "")
+      const link = String(item?.link || "")
+      const combined = `${title} ${snippet}`
+      const dosageMatch = combined.match(/\b\d+(\.\d+)?\s?(mg|mcg|g|ml)\b(?:\s*\/\s*(kg|day|dose))?/i)
+
+      if (!link || !dosageMatch) return null
+
+      const companyName =
+        title.split(/[-|]/)[0]?.trim() ||
+        (() => {
+          try {
+            return new URL(link).hostname.replace("www.", "")
+          } catch {
+            return "Unknown source"
+          }
+        })()
+
+      return {
+        companyName,
+        dosage: dosageMatch[0],
+        orderLink: link,
+        sourceTitle: title || undefined,
+        sourceUrl: link,
+      }
+    })
+    .filter(Boolean)
+    .slice(0, 4) as DosageWebSearchResult[]
+
+  logger.info("[Dosage Web Search] Fallback extraction complete", {
+    extractedCount: extracted.length,
+  })
+
+  return extracted
+}
+
+async function extractDosageWebResultsWithGemini(
+  model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
+  serperData: any,
+  medication: string,
+  indication: string
+) {
+  const organic = Array.isArray(serperData?.organic) ? serperData.organic.slice(0, 8) : []
+  if (organic.length === 0) return []
+
+  logger.info("[Dosage Web Search] Gemini extraction started", {
+    sourceCount: organic.length,
+    medication,
+  })
+
+  const prompt = `You are extracting medication buying and dosage hints from web search data.
+
+Medication: ${medication}
+Indication: ${indication}
+
+Search data:
+${organic
+  .map(
+    (item: any, index: number) =>
+      `${index + 1}. title: ${item?.title || "N/A"}\nurl: ${item?.link || "N/A"}\nsnippet: ${item?.snippet || "N/A"}`
+  )
+  .join("\n\n")}
+
+Return JSON only:
+{
+  "results": [
+    {
+      "companyName": "Company/store/manufacturer name",
+      "dosage": "Dosage string if present, else \"Not specified\"",
+      "orderLink": "Direct purchase/product/listing URL if available, otherwise source URL",
+      "sourceTitle": "Result title",
+      "sourceUrl": "Source URL"
+    }
+  ]
+}
+
+Rules:
+- Return max 4 items.
+- Do not invent data.
+- Prefer pharmacy/manufacturer/product pages.
+- If no credible dosage is present, use "Not specified".`
+
+  const result = await model.generateContent(prompt)
+  const response = await result.response
+  const text = response.text()
+  const jsonMatch = text.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) return []
+
+  const parsed = JSON.parse(jsonMatch[0])
+  const results = Array.isArray(parsed?.results) ? parsed.results : []
+  const normalized = results
+    .map((item: any) => ({
+      companyName: String(item?.companyName || "").trim(),
+      dosage: String(item?.dosage || "Not specified").trim(),
+      orderLink: String(item?.orderLink || item?.sourceUrl || "").trim(),
+      sourceTitle: item?.sourceTitle ? String(item.sourceTitle).trim() : undefined,
+      sourceUrl: item?.sourceUrl ? String(item.sourceUrl).trim() : undefined,
+    }))
+    .filter((item: DosageWebSearchResult) => item.companyName && item.orderLink)
+    .slice(0, 4)
+
+  logger.info("[Dosage Web Search] Gemini extraction complete", {
+    extractedCount: normalized.length,
+  })
+
+  return normalized
+}
 
 /**
  * Differential Diagnosis Assistant
@@ -449,15 +628,51 @@ export async function calculateDosage(
     hepaticFunction?: string
   }
 ) {
+  logger.info("[Dosage Calculator] Started", {
+    medication,
+    age: patientFactors.age,
+    weight: patientFactors.weight,
+    indication: patientFactors.indication,
+  })
+
   const genAI = getGeminiAPI()
 
   if (!genAI) {
+    logger.warn("[Dosage Calculator] Gemini not configured; using fallback")
+
+    let webSearchResults: DosageWebSearchResult[] = []
+    let webSearchSummary = "Gemini API key not configured; web dosage extraction unavailable."
+
+    try {
+      const serperData = await runSerperSearch(
+        `${medication} ${patientFactors.indication} dosage buy online India pharmacy`
+      )
+      if (serperData) {
+        webSearchResults = extractDosageWebResultsFallback(serperData)
+        webSearchSummary =
+          webSearchResults.length > 0
+            ? "Gemini unavailable. Added web references from search results."
+            : "Gemini unavailable. Web search ran, but no dosage/order references were extracted."
+      } else {
+        webSearchSummary =
+          "Set SERPER_API_KEY to enable web dosage fallback when Gemini is unavailable."
+      }
+    } catch (webError) {
+      logger.error("[Dosage Calculator] Web fallback search failed", webError)
+      webSearchSummary =
+        webError instanceof Error
+          ? `Web dosage search unavailable: ${webError.message}`
+          : "Web dosage search unavailable."
+    }
+
     return {
       standardDosage: "Consult drug reference",
       adjustedDosage: "Requires clinical calculation",
       frequency: "As per guidelines",
       warnings: ["Consult current prescribing information"],
       monitoring: ["Regular clinical monitoring required"],
+      webSearchSummary,
+      webSearchResults,
     }
   }
 
@@ -493,7 +708,58 @@ Provide dosage calculation in JSON format:
 
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0])
+      const dosageResult = JSON.parse(jsonMatch[0])
+
+      const isConcreteDosage = hasConcreteDosage(dosageResult)
+      logger.info("[Dosage Calculator] Running web dosage search", {
+        reason: isConcreteDosage ? "supplementary results requested" : "incomplete dosage from Gemini",
+        market: "India",
+      })
+
+      try {
+        const serperData = await runSerperSearch(
+          `${medication} ${patientFactors.indication} dosage buy online India pharmacy`
+        )
+
+        if (serperData) {
+          const aiExtractedResults = await extractDosageWebResultsWithGemini(
+            model,
+            serperData,
+            medication,
+            patientFactors.indication
+          )
+          const webSearchResults =
+            aiExtractedResults.length > 0 ? aiExtractedResults : extractDosageWebResultsFallback(serperData)
+
+          if (webSearchResults.length > 0) {
+            logger.info("[Dosage Calculator] Web dosage search succeeded", {
+              resultCount: webSearchResults.length,
+              market: "India",
+            })
+            dosageResult.webSearchResults = webSearchResults
+            dosageResult.webSearchSummary = isConcreteDosage
+              ? "Supplementary Indian-market product links added from web search."
+              : "AI dosage was incomplete. Added Indian-market web references for company, dosage mention, and ordering links."
+          } else {
+            logger.warn("[Dosage Calculator] Web dosage search returned no usable references")
+            dosageResult.webSearchSummary =
+              "Web search ran for Indian market, but no reliable dosage/order references were extracted."
+          }
+        } else {
+          logger.warn("[Dosage Calculator] Serper key not configured during web search")
+          dosageResult.webSearchSummary =
+            "Set SERPER_API_KEY to enable Indian-market web dosage references."
+        }
+      } catch (webError) {
+        logger.error("[Dosage Calculator] Web dosage search failed", webError)
+        dosageResult.webSearchSummary =
+          webError instanceof Error
+            ? `Web dosage search unavailable: ${webError.message}`
+            : "Web dosage search unavailable."
+      }
+
+      logger.info("[Dosage Calculator] Completed")
+      return dosageResult
     }
 
     throw new Error("Could not parse AI response")

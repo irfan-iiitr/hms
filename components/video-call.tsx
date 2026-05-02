@@ -22,9 +22,9 @@ import {
 import "@stream-io/video-react-sdk/dist/css/styles.css"
 
 // Separate component to use hooks inside StreamCall context
-function VideoCallUI() {
+function VideoCallUI({ onExit }: { onExit: () => Promise<void> }) {
   const { useParticipants, useLocalParticipant, useCameraState, useMicrophoneState, useSpeakerState, useCallCallingState } = useCallStateHooks()
-  const call = useCall()
+  useCall()
   const allParticipants = useParticipants()
   const localParticipant = useLocalParticipant()
   const { camera, isMute: isCameraMuted } = useCameraState()
@@ -126,23 +126,8 @@ function VideoCallUI() {
         console.error("[VideoCallUI] Error disabling speaker:", err)
       }
 
-      // Leave call only if it looks like we're joined/ringing
-      if (call) {
-        try {
-          // Always try to leave. State checks can be stale and may prevent proper disconnect.
-          console.log("[VideoCallUI] Leaving call...")
-          await call.leave()
-          console.log("[VideoCallUI] Call left successfully")
-        } catch (err: any) {
-          // ignore 'already been left' style errors
-          const msg = String(err?.message || err)
-          if (msg.toLowerCase().includes("already been left") || msg.toLowerCase().includes("already left")) {
-            console.log("[VideoCallUI] Call was already left; ignoring error")
-          } else {
-            console.error("[VideoCallUI] Error leaving call:", err)
-          }
-        }
-      }
+      // Force-call and client disconnect (not just leave), to stop lingering remote audio.
+      await onExit()
     } catch (err) {
       console.error("[VideoCallUI] Error during cleanup:", err)
     } finally {
@@ -201,6 +186,40 @@ export default function VideoCall({ callId }: { callId: string }) {
   const [error, setError] = useState<string | null>(null)
   const [client, setClient] = useState<SVClientType | null>(null)
   const [call, setCall] = useState<SVCall | null>(null)
+  const clientRef = useRef<SVClientType | null>(null)
+  const callRef = useRef<SVCall | null>(null)
+  const cleanupInProgressRef = useRef(false)
+
+  const cleanupCallSession = async () => {
+    if (cleanupInProgressRef.current) return
+    cleanupInProgressRef.current = true
+
+    try {
+      if (callRef.current) {
+        try {
+          console.log("[VideoCall] Exiting - leaving call")
+          await callRef.current.leave()
+        } catch (err: any) {
+          const msg = String(err?.message || err).toLowerCase()
+          if (!msg.includes("already been left") && !msg.includes("already left")) {
+            console.error("[VideoCall] Error leaving call during exit:", err)
+          }
+        }
+      }
+
+      if (clientRef.current) {
+        try {
+          console.log("[VideoCall] Exiting - disconnecting stream user")
+          await clientRef.current.disconnectUser()
+        } catch (err) {
+          console.error("[VideoCall] Error disconnecting stream user:", err)
+        }
+      }
+    } finally {
+      callRef.current = null
+      clientRef.current = null
+    }
+  }
 
   useEffect(() => {
     let mounted = true
@@ -234,6 +253,8 @@ export default function VideoCall({ callId }: { callId: string }) {
         await localCall.join({ create: true })
 
         if (!mounted) return
+        clientRef.current = localClient
+        callRef.current = localCall
         setClient(localClient)
         setCall(localCall)
       } catch (err: any) {
@@ -250,14 +271,7 @@ export default function VideoCall({ callId }: { callId: string }) {
       mounted = false
       ;(async () => {
         try {
-          if (localCall) {
-            console.log("[VideoCall] Component unmounted - leaving call")
-            await localCall.leave()
-          }
-          if (localClient) {
-            console.log("[VideoCall] Component unmounted - disconnecting client")
-            await localClient.disconnectUser()
-          }
+          await cleanupCallSession()
         } catch (err) {
           console.error("[VideoCall] Error during component cleanup:", err)
         }
@@ -292,7 +306,7 @@ export default function VideoCall({ callId }: { callId: string }) {
   return (
     <StreamVideo client={client}>
       <StreamCall call={call}>
-        <VideoCallUI />
+        <VideoCallUI onExit={cleanupCallSession} />
       </StreamCall>
     </StreamVideo>
   )

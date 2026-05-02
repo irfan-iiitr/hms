@@ -17,7 +17,8 @@ import {
   Loader2,
   AlertTriangle,
   CheckCircle,
-  XCircle
+  XCircle,
+  ExternalLink
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type {
@@ -608,6 +609,20 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                 </CardContent>
               </Card>
 
+              {dosageLoading && (
+                <Card className="border-emerald-500">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Web Dosage References</CardTitle>
+                    <CardDescription>Searching web for company, dosage, and order links...</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+                    <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
+                    <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+                  </CardContent>
+                </Card>
+              )}
+
               {dosageResult && (
                 <div className="space-y-3 mt-4">
                   <Card>
@@ -674,6 +689,38 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                       </AlertDescription>
                     </Alert>
                   )}
+
+                  <Card className="border-emerald-500">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Web Dosage References</CardTitle>
+                      <CardDescription>
+                        {dosageResult.webSearchSummary || "Web search was skipped because structured dosage was already available."}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      {dosageResult.webSearchResults?.length ? (
+                        dosageResult.webSearchResults.map((item, index) => (
+                          <div key={`${item.orderLink}-${index}`} className="rounded-md border p-3">
+                            <div><strong>Company:</strong> {item.companyName}</div>
+                            <div><strong>Dosage:</strong> {item.dosage}</div>
+                            <a
+                              href={item.orderLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-1 inline-flex items-center gap-1 text-primary hover:underline"
+                            >
+                              Order / Source Link
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-muted-foreground">
+                          No web dosage references found. Add `SERPER_API_KEY` in `.env` to enable web search fallback.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </TabsContent>

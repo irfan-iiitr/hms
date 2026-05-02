@@ -103,6 +103,7 @@ lib/
    \`\`\`bash
    MONGODB_URI=mongodb://localhost:27017/hms
    GEMINI_API_KEY=your_gemini_api_key_here
+   SERPER_API_KEY=your_serper_api_key_here
    \`\`\`
 
 3. **Run the development server**:

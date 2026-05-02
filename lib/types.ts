@@ -333,5 +333,13 @@ export interface DosageCalculation {
   warnings: string[]
   monitoring: string[]
   disclaimer?: string
+  webSearchResults?: {
+    companyName: string
+    dosage: string
+    orderLink: string
+    sourceTitle?: string
+    sourceUrl?: string
+  }[]
+  webSearchSummary?: string
 }
 
