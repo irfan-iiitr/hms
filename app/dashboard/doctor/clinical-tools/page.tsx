@@ -56,6 +56,18 @@ export default function ClinicalToolsPage() {
               <p className="text-muted-foreground mt-2">
                 Advanced clinical decision support powered by AI
               </p>
+              <p className="text-xs text-muted-foreground mt-2 max-w-2xl">
+                Workflow features (human oversight, rationale, doctor action logging) are designed to align with{" "}
+                <a
+                  href="https://ethics.ncdirindia.org/ICMR_Ethical_Guidelines.aspx"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  ICMR ethical guidance on AI in biomedical research and healthcare
+                </a>
+                . This is not a regulatory certification.
+              </p>
             </div>
           </div>
 

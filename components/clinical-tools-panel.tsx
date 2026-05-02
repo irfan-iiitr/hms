@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { 
   Brain, 
   Pill, 
@@ -18,7 +20,8 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
-  ExternalLink
+  ExternalLink,
+  ShieldCheck
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type {
@@ -43,6 +46,35 @@ interface ClinicalToolsPanelProps {
 
 export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) {
   const { toast } = useToast()
+  const [aiAssistConfirmed, setAiAssistConfirmed] = useState(false)
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("clinical_tools_ai_confirmed")
+      setAiAssistConfirmed(saved === "true")
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [])
+
+  const updateAiConfirm = (value: boolean) => {
+    setAiAssistConfirmed(value)
+    try {
+      window.localStorage.setItem("clinical_tools_ai_confirmed", String(value))
+    } catch {
+      // Ignore localStorage errors
+    }
+  }
+
+  const ensureAiConfirm = () => {
+    if (aiAssistConfirmed) return true
+    toast({
+      title: "Confirmation Required",
+      description: "Please confirm AI clinical assistance acknowledgment before using these tools.",
+      variant: "destructive",
+    })
+    return false
+  }
 
   // Differential Diagnosis state
   const [symptoms, setSymptoms] = useState("")
@@ -67,9 +99,17 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
   const [dosageIndication, setDosageIndication] = useState("")
   const [dosageResult, setDosageResult] = useState<DosageCalculation | null>(null)
   const [dosageLoading, setDosageLoading] = useState(false)
+  const [decisionLoading, setDecisionLoading] = useState<string | null>(null)
+  const [doctorActions, setDoctorActions] = useState<Record<string, { decision: string; reason: string }>>({
+    differential: { decision: "", reason: "" },
+    interactions: { decision: "", reason: "" },
+    literature: { decision: "", reason: "" },
+    dosage: { decision: "", reason: "" },
+  })
 
   // Differential Diagnosis
   const handleDifferentialDiagnosis = async () => {
+    if (!ensureAiConfirm()) return
     if (!symptoms.trim()) {
       toast({ title: "Error", description: "Please enter symptoms", variant: "destructive" })
       return
@@ -106,6 +146,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
   // Drug Interactions
   const handleDrugInteraction = async () => {
+    if (!ensureAiConfirm()) return
     if (!medications.trim()) {
       toast({ title: "Error", description: "Please enter medications", variant: "destructive" })
       return
@@ -153,6 +194,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
   // Literature Search
   const handleLiteratureSearch = async () => {
+    if (!ensureAiConfirm()) return
     if (!searchQuery.trim()) {
       toast({ title: "Error", description: "Please enter search query", variant: "destructive" })
       return
@@ -192,6 +234,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
   // Dosage Calculator
   const handleDosageCalculation = async () => {
+    if (!ensureAiConfirm()) return
     if (!dosageMed || !dosageAge || !dosageWeight || !dosageIndication) {
       toast({ title: "Error", description: "Please fill all fields", variant: "destructive" })
       return
@@ -209,6 +252,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
             weight: parseFloat(dosageWeight),
             indication: dosageIndication,
           },
+          aiAssistConfirmed,
         }),
       })
 
@@ -247,6 +291,66 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
     }
   }
 
+  const getConfidenceTone = (value: string) => {
+    switch (value.toLowerCase()) {
+      case "high":
+        return "bg-green-600 text-white"
+      case "moderate":
+        return "bg-yellow-500 text-black"
+      case "low":
+        return "bg-orange-500 text-white"
+      default:
+        return "bg-gray-500 text-white"
+    }
+  }
+
+  const updateDoctorAction = (tool: string, patch: Partial<{ decision: string; reason: string }>) => {
+    setDoctorActions((prev) => ({
+      ...prev,
+      [tool]: {
+        decision: prev[tool]?.decision || "",
+        reason: prev[tool]?.reason || "",
+        ...patch,
+      },
+    }))
+  }
+
+  const saveDoctorAction = async (tool: "differential" | "interactions" | "literature" | "dosage", summary: string) => {
+    const action = doctorActions[tool]
+    if (!action?.decision) {
+      toast({ title: "Error", description: "Please select doctor action", variant: "destructive" })
+      return
+    }
+
+    setDecisionLoading(tool)
+    try {
+      const response = await fetch("/api/clinical-tools/doctor-action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tool,
+          decision: action.decision,
+          reason: action.reason || undefined,
+          summary,
+          aiAssistConfirmed,
+        }),
+      })
+
+      const data = await response.json()
+      if (!data.success) throw new Error(data.message || "Failed to save decision")
+
+      toast({ title: "Saved", description: "Doctor action logged successfully" })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save doctor action",
+        variant: "destructive",
+      })
+    } finally {
+      setDecisionLoading(null)
+    }
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <Card>
@@ -258,8 +362,36 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
           <CardDescription>
             Advanced clinical decision support powered by AI
           </CardDescription>
+          <p className="text-xs text-muted-foreground mt-2">
+            Features here support principles in ICMR&apos;s AI ethics framework—clinician confirmation, explainability
+            cues, and auditable doctor decisions—not a claim of formal compliance.
+          </p>
         </CardHeader>
         <CardContent>
+          <Alert className="mb-4 border-emerald-500">
+            <ShieldCheck className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              <div className="space-y-2">
+                <p>
+                  AI outputs are clinical decision support only and must be verified with professional judgment and
+                  current guidelines.
+                </p>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={aiAssistConfirmed}
+                    onChange={(e) => updateAiConfirm(e.target.checked)}
+                  />
+                  <span>
+                    I confirm I will use AI suggestions as assistive information, not as the sole basis for diagnosis
+                    or prescribing.
+                  </span>
+                </label>
+              </div>
+            </AlertDescription>
+          </Alert>
+
           <Tabs defaultValue="differential" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="differential">Diagnosis</TabsTrigger>
@@ -301,6 +433,24 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                       <strong>Urgency:</strong> {ddResult.urgencyLevel}
                     </AlertDescription>
                   </Alert>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">AI Confidence & Rationale</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                      <div className="flex items-center gap-2">
+                        <strong>Confidence:</strong>
+                        <Badge className={getConfidenceTone(ddResult.differentialDiagnoses[0]?.probability || "Moderate")}>
+                          {ddResult.differentialDiagnoses[0]?.probability || "Moderate"}
+                        </Badge>
+                      </div>
+                      <p>
+                        <strong>Rationale:</strong>{" "}
+                        {ddResult.differentialDiagnoses[0]?.reasoning || "Based on symptom pattern and clinical context."}
+                      </p>
+                    </CardContent>
+                  </Card>
 
                   {ddResult.redFlags.length > 0 && (
                     <Card className="border-red-500">
@@ -363,6 +513,44 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                       </CardContent>
                     </Card>
                   )}
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Doctor Action</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Select
+                        value={doctorActions.differential?.decision || ""}
+                        onValueChange={(value) => updateDoctorAction("differential", { decision: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select action" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="accepted">Accepted</SelectItem>
+                          <SelectItem value="modified">Modified</SelectItem>
+                          <SelectItem value="rejected">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Textarea
+                        placeholder="Optional reason or clinical notes"
+                        value={doctorActions.differential?.reason || ""}
+                        onChange={(e) => updateDoctorAction("differential", { reason: e.target.value })}
+                      />
+                      <Button
+                        variant="outline"
+                        disabled={decisionLoading === "differential"}
+                        onClick={() =>
+                          saveDoctorAction(
+                            "differential",
+                            ddResult.differentialDiagnoses.map((d) => d.condition).slice(0, 3).join(", ")
+                          )
+                        }
+                      >
+                        {decisionLoading === "differential" ? "Saving..." : "Save Doctor Action"}
+                      </Button>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </TabsContent>
@@ -399,6 +587,24 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                       <strong>Overall Risk:</strong> {diResult.overallRisk}
                     </AlertDescription>
                   </Alert>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">AI Confidence & Rationale</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                      <div className="flex items-center gap-2">
+                        <strong>Confidence:</strong>
+                        <Badge className={getConfidenceTone(diResult.hasInteractions ? "High" : "Moderate")}>
+                          {diResult.hasInteractions ? "High" : "Moderate"}
+                        </Badge>
+                      </div>
+                      <p>
+                        <strong>Rationale:</strong>{" "}
+                        {diResult.interactions[0]?.description || "No major interaction evidence detected in this check."}
+                      </p>
+                    </CardContent>
+                  </Card>
 
                   {diResult.hasInteractions ? (
                     <div className="space-y-3">
@@ -468,6 +674,44 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                       </CardContent>
                     </Card>
                   )}
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Doctor Action</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Select
+                        value={doctorActions.interactions?.decision || ""}
+                        onValueChange={(value) => updateDoctorAction("interactions", { decision: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select action" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="accepted">Accepted</SelectItem>
+                          <SelectItem value="modified">Modified</SelectItem>
+                          <SelectItem value="rejected">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Textarea
+                        placeholder="Optional reason or clinical notes"
+                        value={doctorActions.interactions?.reason || ""}
+                        onChange={(e) => updateDoctorAction("interactions", { reason: e.target.value })}
+                      />
+                      <Button
+                        variant="outline"
+                        disabled={decisionLoading === "interactions"}
+                        onClick={() =>
+                          saveDoctorAction(
+                            "interactions",
+                            diResult.interactions.map((i) => i.medications.join(" + ")).slice(0, 3).join(", ")
+                          )
+                        }
+                      >
+                        {decisionLoading === "interactions" ? "Saving..." : "Save Doctor Action"}
+                      </Button>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </TabsContent>
@@ -522,6 +766,24 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
               {litResult && (
                 <div className="space-y-3 mt-4">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">AI Confidence & Rationale</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                      <div className="flex items-center gap-2">
+                        <strong>Confidence:</strong>
+                        <Badge className={getConfidenceTone(litResult.results[0]?.relevance || "Moderate")}>
+                          {litResult.results[0]?.relevance || "Moderate"}
+                        </Badge>
+                      </div>
+                      <p>
+                        <strong>Rationale:</strong>{" "}
+                        {litResult.results[0]?.summary || "Based on relevance-ranked literature search results."}
+                      </p>
+                    </CardContent>
+                  </Card>
+
                   <h4 className="font-semibold">Results ({litResult.totalResults}):</h4>
                   {litResult.results.map((result, i) => (
                     <Card key={i}>
@@ -550,6 +812,44 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                       </CardContent>
                     </Card>
                   ))}
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Doctor Action</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Select
+                        value={doctorActions.literature?.decision || ""}
+                        onValueChange={(value) => updateDoctorAction("literature", { decision: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select action" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="accepted">Accepted</SelectItem>
+                          <SelectItem value="modified">Modified</SelectItem>
+                          <SelectItem value="rejected">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Textarea
+                        placeholder="Optional reason or clinical notes"
+                        value={doctorActions.literature?.reason || ""}
+                        onChange={(e) => updateDoctorAction("literature", { reason: e.target.value })}
+                      />
+                      <Button
+                        variant="outline"
+                        disabled={decisionLoading === "literature"}
+                        onClick={() =>
+                          saveDoctorAction(
+                            "literature",
+                            litResult.results.map((r) => r.title).slice(0, 3).join(", ")
+                          )
+                        }
+                      >
+                        {decisionLoading === "literature" ? "Saving..." : "Save Doctor Action"}
+                      </Button>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </TabsContent>
@@ -625,6 +925,25 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
               {dosageResult && (
                 <div className="space-y-3 mt-4">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">AI Confidence & Rationale</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                      <div className="flex items-center gap-2">
+                        <strong>Confidence:</strong>
+                        <Badge className={getConfidenceTone(dosageResult.webSearchResults?.length ? "High" : "Moderate")}>
+                          {dosageResult.webSearchResults?.length ? "High" : "Moderate"}
+                        </Badge>
+                      </div>
+                      <p>
+                        <strong>Rationale:</strong>{" "}
+                        Dosage recommendation combines patient age/weight/indication with model inference and available
+                        safety warnings.
+                      </p>
+                    </CardContent>
+                  </Card>
+
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm">Dosage Recommendations</CardTitle>
@@ -721,6 +1040,47 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                       )}
                     </CardContent>
                   </Card>
+
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Precaution: Verify allergy status, renal/hepatic function, pregnancy/lactation status, and
+                      medicine label instructions before finalizing any dosage or order recommendation.
+                    </AlertDescription>
+                  </Alert>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Doctor Action</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <Select
+                        value={doctorActions.dosage?.decision || ""}
+                        onValueChange={(value) => updateDoctorAction("dosage", { decision: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select action" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="accepted">Accepted</SelectItem>
+                          <SelectItem value="modified">Modified</SelectItem>
+                          <SelectItem value="rejected">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Textarea
+                        placeholder="Optional reason or clinical notes"
+                        value={doctorActions.dosage?.reason || ""}
+                        onChange={(e) => updateDoctorAction("dosage", { reason: e.target.value })}
+                      />
+                      <Button
+                        variant="outline"
+                        disabled={decisionLoading === "dosage"}
+                        onClick={() => saveDoctorAction("dosage", `${dosageResult.adjustedDosage} | ${dosageResult.frequency}`)}
+                      >
+                        {decisionLoading === "dosage" ? "Saving..." : "Save Doctor Action"}
+                      </Button>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </TabsContent>
@@ -733,7 +1093,8 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
         <AlertDescription className="text-xs">
           <strong>Clinical Decision Support Disclaimer:</strong> These AI-powered tools provide clinical decision
           support and should not replace professional medical judgment. Always verify recommendations with current
-          clinical guidelines and use your clinical expertise.
+          clinical guidelines and use your clinical expertise. Where we reference ICMR guidance, we mean alignment with
+          publicly published ethical principles for AI in healthcare—not endorsement or certification by ICMR.
         </AlertDescription>
       </Alert>
     </div>
