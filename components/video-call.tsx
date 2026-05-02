@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { getAuthHeaders } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
@@ -32,6 +32,8 @@ function VideoCallUI() {
   const { speaker } = useSpeakerState()
   const router = useRouter()
   const [leaving, setLeaving] = useState(false)
+  const [hasBeenConnected, setHasBeenConnected] = useState(false)
+  const leavingRef = useRef(false)
 
   // Filter to only show participants who are actively publishing video/audio
   // Deduplicate by userId to handle multiple sessions from rejoin
@@ -73,8 +75,26 @@ function VideoCallUI() {
   const totalUniqueUsers = new Set(allParticipants.map((p) => p.userId)).size
   const inactiveCount = totalUniqueUsers - activeParticipants.length
   const callingState = useCallCallingState()
+  const normalizedCallingState = String(callingState || "").toLowerCase()
+
+  useEffect(() => {
+    if (normalizedCallingState === "joined" || normalizedCallingState === "ringing") {
+      setHasBeenConnected(true)
+    }
+  }, [normalizedCallingState])
+
+  useEffect(() => {
+    // If user leaves via built-in red "End Call" control, route back immediately.
+    if (!hasBeenConnected || leavingRef.current) return
+    if (["left", "idle", "offline", "unknown"].includes(normalizedCallingState)) {
+      leavingRef.current = true
+      router.replace("/dashboard/appointments")
+    }
+  }, [hasBeenConnected, normalizedCallingState, router])
 
   const handleBack = async () => {
+    if (leavingRef.current) return
+    leavingRef.current = true
     setLeaving(true)
     try {
       console.log("[VideoCallUI] Starting cleanup...")
@@ -109,13 +129,10 @@ function VideoCallUI() {
       // Leave call only if it looks like we're joined/ringing
       if (call) {
         try {
-          if (!callingState || callingState === "JOINED" || callingState === "RINGING") {
-            console.log("[VideoCallUI] Leaving call...")
-            await call.leave()
-            console.log("[VideoCallUI] Call left successfully")
-          } else {
-            console.log("[VideoCallUI] Skipping leave; callingState=", callingState)
-          }
+          // Always try to leave. State checks can be stale and may prevent proper disconnect.
+          console.log("[VideoCallUI] Leaving call...")
+          await call.leave()
+          console.log("[VideoCallUI] Call left successfully")
         } catch (err: any) {
           // ignore 'already been left' style errors
           const msg = String(err?.message || err)
@@ -131,7 +148,7 @@ function VideoCallUI() {
     } finally {
       // Navigate back to appointments with explicit path
       console.log("[VideoCallUI] Navigating to appointments...")
-      router.push("/dashboard/appointments")
+      router.replace("/dashboard/appointments")
     }
   }
 
@@ -170,7 +187,7 @@ function VideoCallUI() {
               </div>
             )}
           </div>
-          <CallControls />
+          <CallControls onLeave={handleBack as any} />
         </main>
       </div>
     </StreamTheme>

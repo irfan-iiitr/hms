@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/lib/auth-context"
+import { useI18n } from "@/lib/i18n"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const { login: authLogin } = useAuth()
+  const { t } = useI18n()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -53,15 +55,17 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <Card className="border-2 border-primary/20">
           <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl text-center">Login</CardTitle>
-            <CardDescription className="text-center text-balance">Sign in as {role}</CardDescription>
+            <CardTitle className="text-2xl text-center">{t("login.title", "Login")}</CardTitle>
+            <CardDescription className="text-center text-balance">
+              {t("login.signInAs", "Sign in as {role}", { role })}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               {error && <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">{error}</div>}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("login.email", "Email")}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -73,7 +77,7 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("login.password", "Password")}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -85,14 +89,14 @@ export default function LoginPage() {
               </div>
 
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in..." : "Sign In"}
+                {loading ? t("login.signingIn", "Signing in...") : t("login.signIn", "Sign In")}
               </Button>
             </form>
 
             <div className="mt-4 text-center text-sm">
-              <span className="text-muted-foreground">Don't have an account? </span>
+              <span className="text-muted-foreground">{t("login.noAccount", "Don't have an account?")} </span>
               <Button variant="link" onClick={() => router.push("/signup")} className="p-0">
-                Sign up
+                {t("login.signup", "Sign up")}
               </Button>
             </div>
           </CardContent>

@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
+import { useI18n } from "@/lib/i18n"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -21,6 +22,7 @@ export default function SignupPage() {
   const [role, setRole] = useState<"patient" | "doctor" | "admin">("patient")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const { t } = useI18n()
 
   useEffect(() => {
     if (user) {
@@ -50,16 +52,16 @@ export default function SignupPage() {
       <div className="w-full max-w-md">
         <Card className="border-2 border-primary/20">
           <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl text-center">Create Account</CardTitle>
-            <CardDescription className="text-center">Join HealthFlow and manage your healthcare</CardDescription>
+            <CardTitle className="text-2xl text-center">{t("signup.title", "Create Account")}</CardTitle>
+            <CardDescription className="text-center">{t("signup.subtitle", "Join HealthFlow and manage your healthcare")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Full Name</label>
+                <label className="text-sm font-medium">{t("signup.fullName", "Full Name")}</label>
                 <Input
                   type="text"
-                  placeholder="Enter your full name"
+                  placeholder={t("signup.fullNamePlaceholder", "Enter your full name")}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required
@@ -67,10 +69,10 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
+                <label className="text-sm font-medium">{t("signup.email", "Email")}</label>
                 <Input
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder={t("signup.emailPlaceholder", "Enter your email")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -78,10 +80,10 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Password</label>
+                <label className="text-sm font-medium">{t("signup.password", "Password")}</label>
                 <Input
                   type="password"
-                  placeholder="Create a password"
+                  placeholder={t("signup.passwordPlaceholder", "Create a password")}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -89,15 +91,15 @@ export default function SignupPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Role</label>
+                <label className="text-sm font-medium">{t("signup.role", "Role")}</label>
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value as "patient" | "doctor" | "admin")}
                   className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
                 >
-                  <option value="patient">Patient</option>
-                  <option value="doctor">Doctor</option>
-                  <option value="admin">Admin</option>
+                  <option value="patient">{t("signup.patient", "Patient")}</option>
+                  <option value="doctor">{t("signup.doctor", "Doctor")}</option>
+                  <option value="admin">{t("signup.admin", "Admin")}</option>
                 </select>
               </div>
 
@@ -108,14 +110,14 @@ export default function SignupPage() {
               )}
 
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Creating Account..." : "Create Account"}
+                {loading ? t("signup.creating", "Creating Account...") : t("signup.create", "Create Account")}
               </Button>
             </form>
 
             <div className="text-center text-sm">
-              <span className="text-muted-foreground">Already have an account? </span>
+              <span className="text-muted-foreground">{t("signup.haveAccount", "Already have an account?")} </span>
               <Link href="/" className="text-primary hover:underline">
-                Sign in
+                {t("signup.signIn", "Sign in")}
               </Link>
             </div>
           </CardContent>
@@ -123,7 +125,7 @@ export default function SignupPage() {
 
         <div className="mt-4 text-center">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
-            Back to Home
+            {t("signup.backHome", "Back to Home")}
           </Link>
         </div>
       </div>
