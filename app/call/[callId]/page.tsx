@@ -11,8 +11,7 @@ export default function CallPage() {
   if (!callId) return <div>Missing callId</div>
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Call: {callId}</h1>
+    <div style={{ padding: 0 }}>
       <VideoCall callId={callId} />
     </div>
   )
