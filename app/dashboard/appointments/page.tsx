@@ -261,34 +261,43 @@ export default function AppointmentsPage() {
                 Upcoming Appointments
               </h2>
               <div className="space-y-3">
-                {scheduled.map((apt) => (
-                  <Card key={apt.id} className="hover:shadow-lg transition-shadow">
-                    <CardContent className="pt-6">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold text-lg">{apt.reason}</h3>
-                          <p className="text-muted-foreground">
-                            {new Date(apt.date).toLocaleDateString("en-US", {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            })}{" "}
-                            at {apt.time}
-                          </p>
-                          {apt.doctorId && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              Doctor: {doctors.find((d) => d.id === apt.doctorId)?.name || apt.doctorId}
+                {scheduled.map((apt) => {
+                  const callId = `appt_${apt.id}`
+                  const isNow = true // optional: implement time check to enable/disable
+                  return (
+                    <Card key={apt.id} className="hover:shadow-lg transition-shadow">
+                      <CardContent className="pt-6">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="font-semibold text-lg">{apt.reason}</h3>
+                            <p className="text-muted-foreground">
+                              {new Date(apt.date).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              })}{" "}
+                              at {apt.time}
                             </p>
-                          )}
-                          {apt.notes && <p className="text-sm mt-2">{apt.notes}</p>}
+                            {apt.doctorId && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Doctor: {doctors.find((d) => d.id === apt.doctorId)?.name || apt.doctorId}
+                              </p>
+                            )}
+                            {apt.notes && <p className="text-sm mt-2">{apt.notes}</p>}
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <span className="bg-blue-500/10 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
+                              Scheduled
+                            </span>
+                            <Link href={`/call/${callId}`}>
+                              <Button disabled={!isNow}>Join Call</Button>
+                            </Link>
+                          </div>
                         </div>
-                        <span className="bg-blue-500/10 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                          Scheduled
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
             </div>
           )}

@@ -1,6 +1,6 @@
 import type { Appointment, MedicalRecord, Prescription, User } from "./types"
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || ""
+const API_URL = ""
 
 const toDate = (value: unknown) => {
   if (!value) return undefined

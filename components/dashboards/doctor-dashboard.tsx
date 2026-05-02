@@ -277,6 +277,8 @@ export default function DoctorDashboard() {
                 <div className="space-y-3">
                   {appointments.slice(0, 5).map((apt) => {
                     const patient = patients.find((p) => p.id === apt.patientId)
+                    const callId = `appt_${apt.id}`
+                    const isNow = true
                     return (
                       <div key={apt.id} className="border border-border rounded-lg p-3">
                         <p className="font-semibold text-sm">{apt.reason}</p>
@@ -286,6 +288,11 @@ export default function DoctorDashboard() {
                         {patient && (
                           <p className="text-xs text-muted-foreground mt-1">Patient: {patient.name}</p>
                         )}
+                        <div className="mt-3 flex gap-2">
+                          <Link href={`/call/${callId}`}>
+                            <Button disabled={!isNow}>Join Call</Button>
+                          </Link>
+                        </div>
                       </div>
                     )
                   })}
