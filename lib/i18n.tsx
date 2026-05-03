@@ -1,12 +1,13 @@
 "use client"
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { extendedMessages } from "@/lib/i18n-messages"
 
 type Language = "en" | "hi"
 
 type Dictionary = Record<string, string>
 
-const dictionaries: Record<Language, Dictionary> = {
+const coreDictionaries: Record<Language, Dictionary> = {
   en: {
     "lang.english": "English",
     "lang.hindi": "Hindi",
@@ -79,6 +80,11 @@ const dictionaries: Record<Language, Dictionary> = {
     "signup.signIn": "साइन इन करें",
     "signup.backHome": "होम पर वापस जाएं",
   },
+}
+
+const dictionaries: Record<Language, Dictionary> = {
+  en: { ...coreDictionaries.en, ...extendedMessages.en },
+  hi: { ...coreDictionaries.hi, ...extendedMessages.hi },
 }
 
 type I18nContextType = {

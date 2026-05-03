@@ -9,9 +9,20 @@ import { fetchAppointments, fetchUsers, updateAppointment } from "@/lib/api"
 import type { Appointment, User } from "@/lib/types"
 import { Calendar, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { useI18n } from "@/lib/i18n"
+
+const statusFilterLabelKey = (s: string) =>
+  s === "all"
+    ? "common.all"
+    : s === "scheduled"
+      ? "appt.statusScheduled"
+      : s === "completed"
+        ? "appt.statusCompleted"
+        : "appt.statusCancelled"
 
 export default function AdminAppointmentsPage() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [statusFilter, setStatusFilter] = useState<"all" | "scheduled" | "completed" | "cancelled">("all")
@@ -29,7 +40,7 @@ export default function AdminAppointmentsPage() {
         setUsers(allUsers)
       } catch (err) {
         console.error("[AdminAppointmentsPage] Failed to load", err)
-        setError("Unable to load appointments. Please try again later.")
+        setError(t("admin.loadApptsError"))
       } finally {
         if (mounted) setLoading(false)
       }
@@ -42,13 +53,17 @@ export default function AdminAppointmentsPage() {
 
   const filteredAppointments = appointments.filter((a) => (statusFilter === "all" ? true : a.status === statusFilter))
 
-  const handleStatusChange = async (aptId: string, newStatus: "scheduled" | "completed" | "cancelled") => {
+  const handleStatusChange = async (
+    aptId: string | undefined,
+    newStatus: "scheduled" | "completed" | "cancelled",
+  ) => {
+    if (!aptId) return
     try {
       const updated = await updateAppointment(aptId, { status: newStatus })
       setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)))
     } catch (err) {
       console.error("[AdminAppointmentsPage] Failed to update status", err)
-      setError("Could not update appointment status. Please try again.")
+      setError(t("admin.updateStatusError"))
     }
   }
 
@@ -75,8 +90,8 @@ export default function AdminAppointmentsPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-balance">Appointment Management</h1>
-              <p className="text-muted-foreground">View and manage all appointments</p>
+              <h1 className="text-3xl font-bold text-balance">{t("admin.apptManagement")}</h1>
+              <p className="text-muted-foreground">{t("admin.apptManagementSubtitle")}</p>
             </div>
           </div>
 
@@ -84,7 +99,7 @@ export default function AdminAppointmentsPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t("admin.statTotal")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stats.total}</div>
@@ -92,7 +107,9 @@ export default function AdminAppointmentsPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Scheduled</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {t("admin.statScheduled")}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">{stats.scheduled}</div>
@@ -100,7 +117,9 @@ export default function AdminAppointmentsPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {t("admin.statCompleted")}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
@@ -108,7 +127,9 @@ export default function AdminAppointmentsPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Cancelled</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {t("admin.statCancelled")}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600">{stats.cancelled}</div>
@@ -128,7 +149,7 @@ export default function AdminAppointmentsPage() {
                     onClick={() => setStatusFilter(status as any)}
                     className="capitalize"
                   >
-                    {status}
+                    {t(statusFilterLabelKey(status))}
                   </Button>
                 ))}
               </div>
@@ -140,26 +161,26 @@ export default function AdminAppointmentsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="w-5 h-5" />
-                Appointments ({filteredAppointments.length})
+                {t("admin.apptsList", undefined, { count: String(filteredAppointments.length) })}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {loading ? (
-                <p className="text-center text-muted-foreground py-8">Loading appointments...</p>
+                <p className="text-center text-muted-foreground py-8">{t("admin.loadingAppts")}</p>
               ) : filteredAppointments.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No appointments found</p>
+                <p className="text-center text-muted-foreground py-8">{t("admin.noApptsFound")}</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border">
-                        <th className="text-left py-3 px-4 font-semibold">Reason</th>
-                        <th className="text-left py-3 px-4 font-semibold">Patient</th>
-                        <th className="text-left py-3 px-4 font-semibold">Doctor</th>
-                        <th className="text-left py-3 px-4 font-semibold">Date</th>
-                        <th className="text-left py-3 px-4 font-semibold">Time</th>
-                        <th className="text-left py-3 px-4 font-semibold">Status</th>
-                        <th className="text-left py-3 px-4 font-semibold">Actions</th>
+                        <th className="text-left py-3 px-4 font-semibold">{t("admin.thReason")}</th>
+                        <th className="text-left py-3 px-4 font-semibold">{t("admin.thPatient")}</th>
+                        <th className="text-left py-3 px-4 font-semibold">{t("admin.thDoctor")}</th>
+                        <th className="text-left py-3 px-4 font-semibold">{t("admin.thDate")}</th>
+                        <th className="text-left py-3 px-4 font-semibold">{t("admin.thTime")}</th>
+                        <th className="text-left py-3 px-4 font-semibold">{t("admin.thStatus")}</th>
+                        <th className="text-left py-3 px-4 font-semibold">{t("admin.thActions")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -186,14 +207,14 @@ export default function AdminAppointmentsPage() {
                                     : "bg-red-500/10 text-red-700"
                               }`}
                             >
-                              <option value="scheduled">Scheduled</option>
-                              <option value="completed">Completed</option>
-                              <option value="cancelled">Cancelled</option>
+                              <option value="scheduled">{t("appt.statusScheduled")}</option>
+                              <option value="completed">{t("appt.statusCompleted")}</option>
+                              <option value="cancelled">{t("appt.statusCancelled")}</option>
                             </select>
                           </td>
                           <td className="py-3 px-4">
                             <Button variant="ghost" size="sm" className="text-xs">
-                              View
+                              {t("admin.view")}
                             </Button>
                           </td>
                         </tr>

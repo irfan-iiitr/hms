@@ -33,6 +33,7 @@ import remarkGfm from "remark-gfm"
 const Markdown: any = ReactMarkdown
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
+import { useI18n } from "@/lib/i18n"
 
 type ChatMessage = { role: "user" | "assistant"; content: string }
 type ClinicalTool = "diagnosis" | "interactions" | "dosage" | "literature"
@@ -40,6 +41,7 @@ type ClinicalTool = "diagnosis" | "interactions" | "dosage" | "literature"
 export default function AISuggestionsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const { t } = useI18n()
   const params = useParams()
   const searchParams = useSearchParams()
   const patientId = params.id as string
@@ -177,7 +179,7 @@ export default function AISuggestionsPage() {
       }
     } catch (err: any) {
       console.error("AI chat error", err)
-      setError(err?.message || "Chat failed")
+      setError(err?.message || t("aiAssistPage.chatFailed"))
     }
   }
 
@@ -195,19 +197,16 @@ export default function AISuggestionsPage() {
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-balance flex items-center gap-2">
                 <Sparkles className="w-8 h-8 text-primary" />
-                AI Treatment Assistant
+                {t("docPatient.aiTreatmentTitle")}
               </h1>
-              <p className="text-muted-foreground mt-1">Give the current condition. We'll combine it with patient records to propose options.</p>
+              <p className="text-muted-foreground mt-1">{t("aiAssistPage.subtitle")}</p>
             </div>
           </div>
 
           {/* Alert */}
           <Alert className="mb-6 bg-blue-500/10 border-blue-500/20">
             <Sparkles className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-600">
-              These are AI-generated suggestions based on the diagnosis and symptoms. Always verify with clinical
-              judgment and current guidelines before prescribing.
-            </AlertDescription>
+            <AlertDescription className="text-blue-600">{t("aiAssistPage.disclaimerAlert")}</AlertDescription>
           </Alert>
 
           {/* 40:60 Split */}
@@ -215,8 +214,8 @@ export default function AISuggestionsPage() {
             {/* Left Pane (40%) */}
             <Card className="md:col-span-2">
               <CardHeader>
-                <CardTitle>Current Condition</CardTitle>
-                <CardDescription>Describe what's going on now</CardDescription>
+                <CardTitle>{t("aiAssistPage.currentCondition")}</CardTitle>
+                <CardDescription>{t("aiAssistPage.currentConditionDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {error && (
@@ -224,33 +223,41 @@ export default function AISuggestionsPage() {
                 )}
                 <form onSubmit={handleGenerate} className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Working Diagnosis (optional)</label>
-                    <Input value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} placeholder="e.g., Type 2 Diabetes" />
+                    <label className="text-sm font-medium">{t("aiAssistPage.workingDiagnosis")}</label>
+                    <Input
+                      value={diagnosis}
+                      onChange={(e) => setDiagnosis(e.target.value)}
+                      placeholder={t("docPatient.diagnosisPh")}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Symptoms (comma-separated)</label>
-                    <Input value={symptoms} onChange={(e) => setSymptoms(e.target.value)} placeholder="e.g., Increased thirst, Fatigue" />
+                    <label className="text-sm font-medium">{t("mr.symptomsLabel")}</label>
+                    <Input
+                      value={symptoms}
+                      onChange={(e) => setSymptoms(e.target.value)}
+                      placeholder={t("docPatient.symptomsPh")}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Chief Complaint / Presenting Condition</label>
+                    <label className="text-sm font-medium">{t("aiAssistPage.chiefComplaint")}</label>
                     <textarea
                       className="w-full min-h-24 px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                      placeholder="Describe current condition, vitals, onset, severity, triggers, etc."
+                      placeholder={t("aiAssistPage.chiefComplaintPh")}
                       value={condition}
                       onChange={(e) => setCondition(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Additional Notes (optional)</label>
+                    <label className="text-sm font-medium">{t("aiAssistPage.additionalNotesOpt")}</label>
                     <textarea
                       className="w-full min-h-24 px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                      placeholder="Anything else relevant for AI to consider"
+                      placeholder={t("aiAssistPage.additionalNotesPh")}
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                     />
                   </div>
                   <Button type="submit" disabled={loading} className="w-full">
-                    {loading ? "Generating..." : "Generate Suggestions"}
+                    {loading ? t("aiAssistPage.generating") : t("aiAssistPage.generateSuggestions")}
                   </Button>
                 </form>
               </CardContent>
@@ -261,16 +268,16 @@ export default function AISuggestionsPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
-                    <CardTitle>AI Suggestions</CardTitle>
+                    <CardTitle>{t("aiAssistPage.suggestionsTitle")}</CardTitle>
                     <CardDescription>
-                      {diagnosis ? `Diagnosis: ${diagnosis} | ` : ""}
-                      {symptoms ? `Symptoms: ${symptoms}` : ""}
+                      {diagnosis ? `${t("aiAssistPage.summaryDiagnosis", undefined, { v: diagnosis })} | ` : ""}
+                      {symptoms ? t("aiAssistPage.summarySymptoms", undefined, { v: symptoms }) : ""}
                     </CardDescription>
                   </div>
                   {!loading && suggestions && (
                     <Button onClick={handleCopy} variant="outline" size="sm" className="gap-2 bg-transparent">
                       {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      {copied ? "Copied" : "Copy"}
+                      {copied ? t("aiAssistPage.copied") : t("aiAssistPage.copy")}
                     </Button>
                   )}
                 </CardHeader>
@@ -279,7 +286,7 @@ export default function AISuggestionsPage() {
                     <div className="flex items-center justify-center py-12">
                       <div className="text-center space-y-4">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-                        <p className="text-muted-foreground">Generating AI suggestions...</p>
+                        <p className="text-muted-foreground">{t("aiAssistPage.generatingWait")}</p>
                       </div>
                     </div>
                   ) : suggestions ? (
@@ -289,7 +296,7 @@ export default function AISuggestionsPage() {
                       </Markdown>
                     </div>
                   ) : (
-                    <p className="text-muted-foreground text-sm">Fill the left panel and click Generate.</p>
+                    <p className="text-muted-foreground text-sm">{t("aiAssistPage.fillPanelHint")}</p>
                   )}
                 </CardContent>
               </Card>
@@ -297,13 +304,13 @@ export default function AISuggestionsPage() {
               {/* Chat */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Ask Follow-Up Questions</CardTitle>
-                  <CardDescription>Get quick answers about this patient's care - ask anything!</CardDescription>
+                  <CardTitle>{t("aiAssistPage.followUpTitle")}</CardTitle>
+                  <CardDescription>{t("aiAssistPage.followUpDesc")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3 max-h-[360px] overflow-y-auto pr-2">
                     {messages.length === 0 ? (
-                      <p className="text-muted-foreground text-sm">No messages yet. Generate suggestions first, then ask questions like "What about diet?" or "Any drug interactions?"</p>
+                      <p className="text-muted-foreground text-sm">{t("aiAssistPage.noMessagesYet")}</p>
                     ) : (
                       messages.map((m, i) => (
                         <div key={i} className={`flex gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -327,14 +334,14 @@ export default function AISuggestionsPage() {
                   </div>
                   <form onSubmit={handleSendMessage} className="mt-3 flex gap-2">
                     <Input
-                      placeholder="e.g., What about dietary changes? Any alternatives to metformin?"
+                      placeholder={t("aiAssistPage.chatPlaceholder")}
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
                       disabled={!suggestions}
                     />
                     <Button type="submit" disabled={!chatInput.trim() || !suggestions} className="gap-2">
                       <Send className="w-4 h-4" />
-                      Send
+                      {t("aiAssistPage.send")}
                     </Button>
                   </form>
                 </CardContent>
@@ -346,11 +353,11 @@ export default function AISuggestionsPage() {
           <div className="flex gap-3 mt-6">
             <Link href={`/dashboard/doctor/patient/${patientId}`} className="flex-1">
               <Button variant="outline" className="w-full bg-transparent">
-                Back to Patient
+                {t("aiAssistPage.backToPatient")}
               </Button>
             </Link>
             <Link href={`/dashboard/doctor/patient/${patientId}`} className="flex-1">
-              <Button className="w-full">Use These Suggestions</Button>
+              <Button className="w-full">{t("aiAssistPage.useSuggestions")}</Button>
             </Link>
           </div>
         </div>

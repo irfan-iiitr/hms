@@ -9,9 +9,11 @@ import { fetchUsers, fetchAppointments } from "@/lib/api"
 import type { User, Appointment } from "@/lib/types"
 import { Users, Calendar, LogOut } from "lucide-react"
 import Link from "next/link"
+import { useI18n } from "@/lib/i18n"
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
+  const { t } = useI18n()
   const router = useRouter()
   const [users, setUsers] = useState<User[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -29,7 +31,7 @@ export default function AdminDashboard() {
         setAppointments(allAppointments)
       } catch (err) {
         console.error("[AdminDashboard] Failed to load data", err)
-        setError("Unable to load admin data. Please try again later.")
+        setError(t("admin.loadError", "Unable to load admin data. Please try again later."))
       } finally {
         if (mounted) setLoading(false)
       }
@@ -70,12 +72,12 @@ export default function AdminDashboard() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-balance">Admin Dashboard</h1>
-            <p className="text-muted-foreground mt-2">System management and oversight</p>
+            <h1 className="text-4xl font-bold text-balance">{t("admin.title", "Admin Dashboard")}</h1>
+            <p className="text-muted-foreground mt-2">{t("admin.subtitle", "System management and oversight")}</p>
           </div>
           <Button onClick={handleLogout} variant="outline" size="lg" className="gap-2 bg-transparent">
             <LogOut className="w-4 h-4" />
-            Logout
+            {t("common.logout", "Logout")}
           </Button>
         </div>
 
@@ -88,7 +90,7 @@ export default function AdminDashboard() {
           <Link href="/dashboard/admin/users">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Users</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t("common.totalUsers", "Total Users")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{userStats.total}</div>
@@ -97,7 +99,7 @@ export default function AdminDashboard() {
           </Link>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Patients</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("common.patients", "Patients")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{userStats.patients}</div>
@@ -105,7 +107,7 @@ export default function AdminDashboard() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Doctors</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("common.doctors", "Doctors")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{userStats.doctors}</div>
@@ -114,7 +116,7 @@ export default function AdminDashboard() {
           <Link href="/dashboard/admin/appointments">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Appointments</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t("common.appointmentsCount", "Appointments")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{appointments.length}</div>
@@ -128,26 +130,32 @@ export default function AdminDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
-              Users Overview
+              {t("admin.usersOverview", "Users Overview")}
             </CardTitle>
-            <CardDescription>Breakdown by role</CardDescription>
+            <CardDescription>{t("admin.breakdownByRole", "Breakdown by role")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="border border-border rounded-lg p-4">
-                <p className="text-sm text-muted-foreground mb-2">Patients</p>
+                <p className="text-sm text-muted-foreground mb-2">{t("common.patients", "Patients")}</p>
                 <p className="text-3xl font-bold text-blue-600">{userStats.patients}</p>
-                <p className="text-xs text-muted-foreground mt-2">{userStats.pctPatients}% of total</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {t("admin.pctOfTotal", "{pct}% of total", { pct: String(userStats.pctPatients) })}
+                </p>
               </div>
               <div className="border border-border rounded-lg p-4">
-                <p className="text-sm text-muted-foreground mb-2">Doctors</p>
+                <p className="text-sm text-muted-foreground mb-2">{t("common.doctors", "Doctors")}</p>
                 <p className="text-3xl font-bold text-green-600">{userStats.doctors}</p>
-                <p className="text-xs text-muted-foreground mt-2">{userStats.pctDoctors}% of total</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {t("admin.pctOfTotal", "{pct}% of total", { pct: String(userStats.pctDoctors) })}
+                </p>
               </div>
               <div className="border border-border rounded-lg p-4">
-                <p className="text-sm text-muted-foreground mb-2">Admins</p>
+                <p className="text-sm text-muted-foreground mb-2">{t("admin.adminsLabel", "Admins")}</p>
                 <p className="text-3xl font-bold text-purple-600">{userStats.admins}</p>
-                <p className="text-xs text-muted-foreground mt-2">{userStats.pctAdmins}% of total</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {t("admin.pctOfTotal", "{pct}% of total", { pct: String(userStats.pctAdmins) })}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -156,7 +164,7 @@ export default function AdminDashboard() {
         {/* Recent Users */}
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>Recent Users</CardTitle>
+            <CardTitle>{t("admin.recentUsers", "Recent Users")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -187,15 +195,15 @@ export default function AdminDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="w-5 h-5" />
-              Appointments Overview
+              {t("admin.apptOverview", "Appointments Overview")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {loading ? (
-                <p className="text-muted-foreground">Loading appointments...</p>
+                <p className="text-muted-foreground">{t("admin.loadingAppts", "Loading appointments...")}</p>
               ) : appointments.length === 0 ? (
-                <p className="text-muted-foreground">No appointments available</p>
+                <p className="text-muted-foreground">{t("admin.noAppts", "No appointments available")}</p>
               ) : (
                 appointments.slice(0, 8).map((apt) => (
                   <div

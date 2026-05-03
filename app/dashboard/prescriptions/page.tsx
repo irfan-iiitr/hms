@@ -10,9 +10,11 @@ import { fetchPrescriptionsByPatient } from "@/lib/api"
 import type { Prescription } from "@/lib/types"
 import { Pill, AlertTriangle, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { useI18n } from "@/lib/i18n"
 
 export default function PrescriptionsPage() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
 
   useEffect(() => {
@@ -44,8 +46,8 @@ export default function PrescriptionsPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-balance">Prescriptions</h1>
-              <p className="text-muted-foreground">Manage your medications</p>
+              <h1 className="text-3xl font-bold text-balance">{t("rx.title", "Prescriptions")}</h1>
+              <p className="text-muted-foreground">{t("rx.subtitle", "Manage your medications")}</p>
             </div>
           </div>
 
@@ -54,7 +56,7 @@ export default function PrescriptionsPage() {
             {prescriptions.length === 0 ? (
               <Alert>
                 <Pill className="h-4 w-4" />
-                <AlertDescription>No prescriptions available</AlertDescription>
+                <AlertDescription>{t("rx.none", "No prescriptions available")}</AlertDescription>
               </Alert>
             ) : (
               prescriptions.map((rx) => (
@@ -69,15 +71,15 @@ export default function PrescriptionsPage() {
                         <div>
                           <CardTitle>{rx.medications.map((m) => m.name).join(" + ")}</CardTitle>
                           <CardDescription>
-                            Issued: {new Date(rx.issuedDate).toLocaleDateString()} • Expires:{" "}
-                            {new Date(rx.expiryDate).toLocaleDateString()}
+                            {t("rx.issued", "Issued")}: {new Date(rx.issuedDate).toLocaleDateString()} •{" "}
+                            {t("rx.expires", "Expires")}: {new Date(rx.expiryDate).toLocaleDateString()}
                           </CardDescription>
                         </div>
                       </div>
                       {isExpired(rx.expiryDate) && (
                         <div className="flex items-center gap-2 text-destructive">
                           <AlertTriangle className="w-4 h-4" />
-                          <span className="text-sm font-semibold">Expired</span>
+                          <span className="text-sm font-semibold">{t("rx.expired", "Expired")}</span>
                         </div>
                       )}
                     </div>

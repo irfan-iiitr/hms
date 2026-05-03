@@ -13,9 +13,12 @@ import { fetchAppointmentsByPatient, fetchDoctors, createAppointment, fetchUsers
 import type { Appointment, User } from "@/lib/types"
 import { Calendar, Plus, ArrowLeft, CheckCircle, Clock } from "lucide-react"
 import Link from "next/link"
+import { useI18n } from "@/lib/i18n"
 
 export default function AppointmentsPage() {
   const { user } = useAuth()
+  const { t, language } = useI18n()
+  const dateLocale = language === "hi" ? "hi-IN" : "en-US"
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [showForm, setShowForm] = useState(false)
   const [doctors, setDoctors] = useState<User[]>([])
@@ -58,7 +61,7 @@ export default function AppointmentsPage() {
         }
       })
       .catch((fetchError) => {
-        setError("Could not load doctors. Please try again later.")
+        setError(t("appt.loadDoctorsError"))
       })
     return () => {
       mounted = false
@@ -100,7 +103,7 @@ export default function AppointmentsPage() {
       time,
     })
     if (!patientId || !reason || !date || !time || !doctorId) {
-      setError("Missing required details. Please ensure you are logged in and all fields are filled.")
+      setError(t("appt.missingDetails"))
       return
     }
 
@@ -125,7 +128,7 @@ export default function AppointmentsPage() {
       setShowForm(false)
     } catch (err) {
       console.error("[AppointmentsPage] Failed to schedule appointment", err)
-      setError(err instanceof Error ? err.message : "Could not schedule appointment")
+      setError(err instanceof Error ? err.message : t("appt.scheduleError"))
     } finally {
       setLoading(false)
     }
@@ -146,12 +149,12 @@ export default function AppointmentsPage() {
               </Button>
             </Link>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-balance">Appointments</h1>
-              <p className="text-muted-foreground">Schedule and manage your appointments</p>
+              <h1 className="text-3xl font-bold text-balance">{t("appt.title")}</h1>
+              <p className="text-muted-foreground">{t("appt.subtitle")}</p>
             </div>
             <Button onClick={() => setShowForm(!showForm)} className="gap-2">
               <Plus className="w-4 h-4" />
-              Schedule
+              {t("appt.scheduleShort")}
             </Button>
           </div>
 
@@ -159,7 +162,7 @@ export default function AppointmentsPage() {
           {showForm && (
             <Card className="mb-6 border-primary/50">
               <CardHeader>
-                <CardTitle>Schedule New Appointment</CardTitle>
+                <CardTitle>{t("appt.scheduleNewTitle")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {error && (
@@ -169,9 +172,9 @@ export default function AppointmentsPage() {
                 )}
                 <form onSubmit={handleAddAppointment} className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Reason for Visit</label>
+                    <label className="text-sm font-medium">{t("appt.reason")}</label>
                     <Input
-                      placeholder="e.g., General Checkup"
+                      placeholder={t("appt.reasonPh")}
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                       required
@@ -180,11 +183,11 @@ export default function AppointmentsPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Date</label>
+                      <label className="text-sm font-medium">{t("appt.date")}</label>
                       <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Time</label>
+                      <label className="text-sm font-medium">{t("appt.time")}</label>
                       {/* Show only available slots for selected doctor */}
                       {doctorSlots.length > 0 ? (
                         <select
@@ -194,7 +197,7 @@ export default function AppointmentsPage() {
                           required
                         >
                           <option value="" disabled>
-                            Select available time
+                            {t("appt.selectTime")}
                           </option>
                           {doctorSlots.map((slot) => (
                             <option key={slot} value={slot}>
@@ -209,7 +212,7 @@ export default function AppointmentsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Select Doctor</label>
+                    <label className="text-sm font-medium">{t("mr.selectDoctor")}</label>
                     <select
                       value={doctorId}
                       onChange={(e) => setDoctorId(e.target.value)}
@@ -218,7 +221,7 @@ export default function AppointmentsPage() {
                     >
                       {doctors.length === 0 ? (
                         <option value="" disabled>
-                          No doctors available
+                          {t("appt.noDoctors")}
                         </option>
                       ) : (
                         doctors.map((doctor) => (
@@ -231,10 +234,10 @@ export default function AppointmentsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Notes (optional)</label>
+                    <label className="text-sm font-medium">{t("appt.notesOptional")}</label>
                     <textarea
                       className="w-full min-h-20 px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                      placeholder="Any additional information for your doctor"
+                      placeholder={t("appt.notesPh")}
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                     />
@@ -242,10 +245,10 @@ export default function AppointmentsPage() {
 
                   <div className="flex gap-2">
                     <Button type="submit" disabled={loading || doctors.length === 0}>
-                      {loading ? "Scheduling..." : "Schedule Appointment"}
+                      {loading ? t("appt.scheduling") : t("appt.scheduleSubmit")}
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                   </div>
                 </form>
@@ -258,7 +261,7 @@ export default function AppointmentsPage() {
             <div className="mb-8">
               <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                 <Clock className="w-6 h-6" />
-                Upcoming Appointments
+                {t("appt.upcomingTitle")}
               </h2>
               <div className="space-y-3">
                 {scheduled.map((apt) => {
@@ -271,26 +274,29 @@ export default function AppointmentsPage() {
                           <div>
                             <h3 className="font-semibold text-lg">{apt.reason}</h3>
                             <p className="text-muted-foreground">
-                              {new Date(apt.date).toLocaleDateString("en-US", {
+                              {new Date(apt.date).toLocaleDateString(dateLocale, {
                                 year: "numeric",
                                 month: "long",
                                 day: "numeric",
                               })}{" "}
-                              at {apt.time}
+                              {t("appt.atTime", undefined, { time: apt.time })}
                             </p>
                             {apt.doctorId && (
                               <p className="text-sm text-muted-foreground mt-1">
-                                Doctor: {doctors.find((d) => d.id === apt.doctorId)?.name || apt.doctorId}
+                                {t("mr.doctorLine", undefined, {
+                                  name:
+                                    doctors.find((d) => d.id === apt.doctorId)?.name || String(apt.doctorId),
+                                })}
                               </p>
                             )}
                             {apt.notes && <p className="text-sm mt-2">{apt.notes}</p>}
                           </div>
                           <div className="flex flex-col items-end gap-2">
                             <span className="bg-blue-500/10 text-blue-700 px-3 py-1 rounded-full text-sm font-medium">
-                              Scheduled
+                              {t("appt.statusScheduled")}
                             </span>
                             <Link href={`/call/${callId}`}>
-                              <Button disabled={!isNow}>Join Call</Button>
+                              <Button disabled={!isNow}>{t("demoAppt.join")}</Button>
                             </Link>
                           </div>
                         </div>
@@ -307,7 +313,7 @@ export default function AppointmentsPage() {
             <div>
               <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                 <CheckCircle className="w-6 h-6" />
-                Completed Appointments
+                {t("appt.completedTitle")}
               </h2>
               <div className="space-y-3">
                 {completed.map((apt) => (
@@ -317,21 +323,24 @@ export default function AppointmentsPage() {
                         <div>
                           <h3 className="font-semibold text-lg">{apt.reason}</h3>
                           <p className="text-muted-foreground">
-                            {new Date(apt.date).toLocaleDateString("en-US", {
+                            {new Date(apt.date).toLocaleDateString(dateLocale, {
                               year: "numeric",
                               month: "long",
                               day: "numeric",
                             })}{" "}
-                            at {apt.time}
+                            {t("appt.atTime", undefined, { time: apt.time })}
                           </p>
                           {apt.doctorId && (
                             <p className="text-sm text-muted-foreground mt-1">
-                              Doctor: {doctors.find((d) => d.id === apt.doctorId)?.name || apt.doctorId}
+                              {t("mr.doctorLine", undefined, {
+                                name:
+                                  doctors.find((d) => d.id === apt.doctorId)?.name || String(apt.doctorId),
+                              })}
                             </p>
                           )}
                         </div>
                         <span className="bg-green-500/10 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
-                          Completed
+                          {t("appt.statusCompleted")}
                         </span>
                       </div>
                     </CardContent>
@@ -344,7 +353,7 @@ export default function AppointmentsPage() {
           {appointments.length === 0 && (
             <Alert>
               <Calendar className="h-4 w-4" />
-              <AlertDescription>No appointments yet. Schedule one to get started.</AlertDescription>
+              <AlertDescription>{t("appt.emptyHint")}</AlertDescription>
             </Alert>
           )}
         </div>

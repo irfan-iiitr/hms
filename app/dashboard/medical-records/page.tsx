@@ -13,9 +13,12 @@ import { fetchMedicalRecordsByPatient, fetchDoctors, createMedicalRecord } from 
 import type { MedicalRecord, User } from "@/lib/types"
 import { FileText, Plus, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { useI18n } from "@/lib/i18n"
 
 export default function MedicalRecordsPage() {
   const { user } = useAuth()
+  const { t, language } = useI18n()
+  const dateLocale = language === "hi" ? "hi-IN" : "en-US"
   const [records, setRecords] = useState<MedicalRecord[]>([])
   const [showForm, setShowForm] = useState(false)
   const [diagnosis, setDiagnosis] = useState("")
@@ -39,7 +42,7 @@ export default function MedicalRecordsPage() {
       })
       .catch((fetchError) => {
         console.error("[MedicalRecordsPage] Failed to fetch records", fetchError)
-        setError("Unable to load medical records. Please try again later.")
+        setError(t("mr.loadError"))
       })
     return () => {
       mounted = false
@@ -77,7 +80,7 @@ export default function MedicalRecordsPage() {
       symptoms,
     })
     if (!patientId || !diagnosis || !doctorId) {
-      setError("Missing required information. Please fill out all fields.")
+      setError(t("mr.missingFields"))
       return
     }
 
@@ -104,7 +107,7 @@ export default function MedicalRecordsPage() {
       setShowForm(false)
     } catch (err) {
       console.error("[MedicalRecordsPage] Failed to create record", err)
-      setError(err instanceof Error ? err.message : "Could not create medical record")
+      setError(err instanceof Error ? err.message : t("mr.createError"))
     } finally {
       setLoading(false)
     }
@@ -122,12 +125,12 @@ export default function MedicalRecordsPage() {
               </Button>
             </Link>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-balance">Medical Records</h1>
-              <p className="text-muted-foreground">View and manage your health records</p>
+              <h1 className="text-3xl font-bold text-balance">{t("mr.title")}</h1>
+              <p className="text-muted-foreground">{t("mr.subtitle")}</p>
             </div>
             <Button onClick={() => setShowForm(!showForm)} className="gap-2">
               <Plus className="w-4 h-4" />
-              Add Record
+              {t("mr.addRecord")}
             </Button>
           </div>
 
@@ -141,7 +144,7 @@ export default function MedicalRecordsPage() {
           {showForm && (
             <Card className="mb-6 border-primary/50">
               <CardHeader>
-                <CardTitle>Add Medical Record</CardTitle>
+                <CardTitle>{t("mr.formTitle")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {error && (
@@ -151,9 +154,9 @@ export default function MedicalRecordsPage() {
                 )}
                 <form onSubmit={handleAddRecord} className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Diagnosis</label>
+                    <label className="text-sm font-medium">{t("mr.diagnosis")}</label>
                     <Input
-                      placeholder="e.g., Hypertension"
+                      placeholder={t("mr.diagnosisPh")}
                       value={diagnosis}
                       onChange={(e) => setDiagnosis(e.target.value)}
                       required
@@ -161,7 +164,7 @@ export default function MedicalRecordsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Select Doctor</label>
+                    <label className="text-sm font-medium">{t("mr.selectDoctor")}</label>
                     <select
                       value={doctorId}
                       onChange={(e) => setDoctorId(e.target.value)}
@@ -170,7 +173,7 @@ export default function MedicalRecordsPage() {
                     >
                       {doctors.length === 0 ? (
                         <option value="" disabled>
-                          No doctors available
+                          {t("mr.noDoctors")}
                         </option>
                       ) : (
                         doctors.map((doctor) => (
@@ -183,9 +186,9 @@ export default function MedicalRecordsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Symptoms (comma-separated)</label>
+                    <label className="text-sm font-medium">{t("mr.symptomsLabel")}</label>
                     <Input
-                      placeholder="e.g., High blood pressure, Headaches"
+                      placeholder={t("mr.symptomsPh")}
                       value={symptoms}
                       onChange={(e) => setSymptoms(e.target.value)}
                     />
@@ -203,10 +206,10 @@ export default function MedicalRecordsPage() {
 
                   <div className="flex gap-2">
                     <Button type="submit" disabled={loading || doctors.length === 0}>
-                      {loading ? "Saving..." : "Save Record"}
+                      {loading ? t("mr.saving") : t("mr.saveRecord")}
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                   </div>
                 </form>
@@ -219,7 +222,7 @@ export default function MedicalRecordsPage() {
             {records.length === 0 ? (
               <Alert>
                 <FileText className="h-4 w-4" />
-                <AlertDescription>No medical records yet. Add one to get started.</AlertDescription>
+                <AlertDescription>{t("mr.emptyHint")}</AlertDescription>
               </Alert>
             ) : (
               records.map((record) => {
@@ -234,20 +237,24 @@ export default function MedicalRecordsPage() {
                           {record.diagnosis}
                         </CardTitle>
                         <CardDescription>
-                          {new Date(record.date).toLocaleDateString("en-US", {
+                          {new Date(record.date).toLocaleDateString(dateLocale, {
                             year: "numeric",
                             month: "long",
                             day: "numeric",
                           })}
                         </CardDescription>
-                        {doctor && <p className="text-sm text-muted-foreground">Doctor: {doctor.name}</p>}
+                        {doctor && (
+                          <p className="text-sm text-muted-foreground">
+                            {t("mr.doctorLine", undefined, { name: doctor.name || doctor.email || "" })}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {record.symptoms.length > 0 && (
                       <div>
-                        <h4 className="text-sm font-semibold mb-2">Symptoms:</h4>
+                        <h4 className="text-sm font-semibold mb-2">{t("mr.symptomsHeading")}</h4>
                         <div className="flex flex-wrap gap-2">
                           {record.symptoms.map((symptom, idx) => (
                             <span key={idx} className="bg-muted px-2 py-1 rounded text-sm">
@@ -259,7 +266,7 @@ export default function MedicalRecordsPage() {
                     )}
                     {record.notes && (
                       <div>
-                        <h4 className="text-sm font-semibold mb-2">Notes:</h4>
+                        <h4 className="text-sm font-semibold mb-2">{t("mr.notesHeading")}</h4>
                         <p className="text-muted-foreground text-sm">{record.notes}</p>
                       </div>
                     )}

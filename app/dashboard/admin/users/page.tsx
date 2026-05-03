@@ -10,9 +10,17 @@ import { fetchUsers, deleteUser } from "@/lib/api"
 import type { User } from "@/lib/types"
 import { Users, Search, ArrowLeft, Trash2 } from "lucide-react"
 import Link from "next/link"
+import { useI18n } from "@/lib/i18n"
+
+const roleLabelKey = (r: string) =>
+  r === "all" ? "common.all" : r === "patient" ? "signup.patient" : r === "doctor" ? "signup.doctor" : "signup.admin"
+
+const userRoleLabelKey = (role: string) =>
+  role === "patient" ? "signup.patient" : role === "doctor" ? "signup.doctor" : "signup.admin"
 
 export default function AdminUsersPage() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [users, setUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [roleFilter, setRoleFilter] = useState<"all" | "patient" | "doctor" | "admin">("all")
@@ -29,7 +37,7 @@ export default function AdminUsersPage() {
         setUsers(items)
       } catch (err) {
         console.error("[AdminUsersPage] Failed to load users", err)
-        setError("Unable to load users. Please try again later.")
+        setError(t("admin.loadUsersError"))
       } finally {
         if (mounted) setLoading(false)
       }
@@ -47,7 +55,7 @@ export default function AdminUsersPage() {
       setUsers((prev) => prev.filter((u) => u.id !== id))
     } catch (err) {
       console.error("[AdminUsersPage] Failed to delete user", err)
-      setError("Failed to delete user. Please try again.")
+      setError(t("admin.deleteUserError"))
     }
   }
 
@@ -75,8 +83,8 @@ export default function AdminUsersPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-balance">User Management</h1>
-              <p className="text-muted-foreground">Manage all users in the system</p>
+              <h1 className="text-3xl font-bold text-balance">{t("admin.userManagement")}</h1>
+              <p className="text-muted-foreground">{t("admin.userManagementSubtitle")}</p>
             </div>
           </div>
 
@@ -87,14 +95,14 @@ export default function AdminUsersPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search by name or email..."
+                    placeholder={t("admin.searchUsersPh")}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Filter by Role</label>
+                  <label className="text-sm font-medium mb-2 block">{t("admin.filterByRole")}</label>
                   <div className="flex gap-2 flex-wrap">
                     {["all", "patient", "doctor", "admin"].map((r) => (
                       <Button
@@ -104,7 +112,7 @@ export default function AdminUsersPage() {
                         onClick={() => setRoleFilter(r as any)}
                         className="capitalize"
                       >
-                        {r}
+                        {t(roleLabelKey(r))}
                       </Button>
                     ))}
                   </div>
@@ -118,34 +126,34 @@ export default function AdminUsersPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="w-5 h-5" />
-                All Users ({filteredUsers.length})
+                {t("admin.allUsers", undefined, { count: String(filteredUsers.length) })}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {loading ? (
-                <p className="text-center text-muted-foreground py-8">Loading users...</p>
+                <p className="text-center text-muted-foreground py-8">{t("admin.loadingUsers")}</p>
               ) : filteredUsers.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No users found</p>
+                <p className="text-center text-muted-foreground py-8">{t("admin.noUsersFound")}</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border">
-                        <th className="text-left py-3 px-4 font-semibold">Name</th>
-                        <th className="text-left py-3 px-4 font-semibold">Email</th>
-                        <th className="text-left py-3 px-4 font-semibold">Role</th>
-                        <th className="text-left py-3 px-4 font-semibold">Joined</th>
-                        <th className="text-left py-3 px-4 font-semibold">Actions</th>
+                        <th className="text-left py-3 px-4 font-semibold">{t("admin.thName")}</th>
+                        <th className="text-left py-3 px-4 font-semibold">{t("admin.thEmail")}</th>
+                        <th className="text-left py-3 px-4 font-semibold">{t("admin.thRole")}</th>
+                        <th className="text-left py-3 px-4 font-semibold">{t("admin.thJoined")}</th>
+                        <th className="text-left py-3 px-4 font-semibold">{t("admin.thActions")}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredUsers.map((u) => (
                         <tr key={u.id} className="border-b border-border hover:bg-muted/50">
-                          <td className="py-3 px-4">{u.name || u.fullName || "Unnamed User"}</td>
+                          <td className="py-3 px-4">{u.name || u.fullName || t("admin.unnamedUser")}</td>
                           <td className="py-3 px-4 text-muted-foreground">{u.email}</td>
                           <td className="py-3 px-4">
                             <span className="capitalize inline-block px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                              {u.role}
+                              {t(userRoleLabelKey(u.role))}
                             </span>
                           </td>
                           <td className="py-3 px-4 text-muted-foreground">

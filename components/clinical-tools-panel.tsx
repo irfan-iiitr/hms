@@ -24,6 +24,7 @@ import {
   ShieldCheck
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useI18n } from "@/lib/i18n"
 import type {
   DifferentialDiagnosisResult,
   DrugInteractionResult,
@@ -46,6 +47,7 @@ interface ClinicalToolsPanelProps {
 
 export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) {
   const { toast } = useToast()
+  const { t } = useI18n()
   const [aiAssistConfirmed, setAiAssistConfirmed] = useState(false)
 
   useEffect(() => {
@@ -69,8 +71,11 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
   const ensureAiConfirm = () => {
     if (aiAssistConfirmed) return true
     toast({
-      title: "Confirmation Required",
-      description: "Please confirm AI clinical assistance acknowledgment before using these tools.",
+      title: t("ct.confirmRequiredTitle", "Confirmation Required"),
+      description: t(
+        "ct.confirmRequiredDesc",
+        "Please confirm AI clinical assistance acknowledgment before using these tools.",
+      ),
       variant: "destructive",
     })
     return false
@@ -111,7 +116,11 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
   const handleDifferentialDiagnosis = async () => {
     if (!ensureAiConfirm()) return
     if (!symptoms.trim()) {
-      toast({ title: "Error", description: "Please enter symptoms", variant: "destructive" })
+      toast({
+        title: t("common.error", "Error"),
+        description: t("ct.error.symptoms", "Please enter symptoms"),
+        variant: "destructive",
+      })
       return
     }
 
@@ -129,13 +138,16 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
       const data = await response.json()
       if (data.success) {
         setDdResult(data.data)
-        toast({ title: "Analysis Complete", description: "Differential diagnoses generated" })
+        toast({
+          title: t("ct.toast.ddDone", "Analysis Complete"),
+          description: t("ct.toast.ddDesc", "Differential diagnoses generated"),
+        })
       } else {
         throw new Error(data.message)
       }
     } catch (error) {
       toast({
-        title: "Error",
+        title: t("common.error", "Error"),
         description: error instanceof Error ? error.message : "Failed to generate diagnosis",
         variant: "destructive",
       })
@@ -148,7 +160,11 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
   const handleDrugInteraction = async () => {
     if (!ensureAiConfirm()) return
     if (!medications.trim()) {
-      toast({ title: "Error", description: "Please enter medications", variant: "destructive" })
+      toast({
+        title: t("common.error", "Error"),
+        description: t("ct.error.meds", "Please enter medications"),
+        variant: "destructive",
+      })
       return
     }
 
@@ -173,17 +189,19 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
       if (data.success) {
         setDiResult(data.data)
         toast({
-          title: "Check Complete",
+          title: t("ct.toast.rxDone", "Check Complete"),
           description: data.data.hasInteractions
-            ? `Found ${data.data.interactions.length} interaction(s)`
-            : "No interactions found",
+            ? t("ct.toast.rxInteractions", "Found {count} interaction(s)", {
+                count: String(data.data.interactions.length),
+              })
+            : t("ct.toast.rxNone", "No interactions found"),
         })
       } else {
         throw new Error(data.message)
       }
     } catch (error) {
       toast({
-        title: "Error",
+        title: t("common.error", "Error"),
         description: error instanceof Error ? error.message : "Failed to check interactions",
         variant: "destructive",
       })
@@ -196,7 +214,11 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
   const handleLiteratureSearch = async () => {
     if (!ensureAiConfirm()) return
     if (!searchQuery.trim()) {
-      toast({ title: "Error", description: "Please enter search query", variant: "destructive" })
+      toast({
+        title: t("common.error", "Error"),
+        description: t("ct.error.query", "Please enter search query"),
+        variant: "destructive",
+      })
       return
     }
 
@@ -215,15 +237,17 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
       if (data.success) {
         setLitResult(data.data)
         toast({
-          title: "Search Complete",
-          description: `Found ${data.data.results?.length || 0} results`,
+          title: t("ct.toast.litDone", "Search Complete"),
+          description: t("ct.toast.litDesc", "Found {count} results", {
+            count: String(data.data.results?.length || 0),
+          }),
         })
       } else {
         throw new Error(data.message)
       }
     } catch (error) {
       toast({
-        title: "Error",
+        title: t("common.error", "Error"),
         description: error instanceof Error ? error.message : "Failed to search literature",
         variant: "destructive",
       })
@@ -236,7 +260,11 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
   const handleDosageCalculation = async () => {
     if (!ensureAiConfirm()) return
     if (!dosageMed || !dosageAge || !dosageWeight || !dosageIndication) {
-      toast({ title: "Error", description: "Please fill all fields", variant: "destructive" })
+      toast({
+        title: t("common.error", "Error"),
+        description: t("ct.error.fields", "Please fill all fields"),
+        variant: "destructive",
+      })
       return
     }
 
@@ -259,13 +287,16 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
       const data = await response.json()
       if (data.success) {
         setDosageResult(data.data)
-        toast({ title: "Calculation Complete", description: "Dosage recommendations generated" })
+        toast({
+          title: t("ct.toast.doseDone", "Calculation Complete"),
+          description: t("ct.toast.doseDesc", "Dosage recommendations generated"),
+        })
       } else {
         throw new Error(data.message)
       }
     } catch (error) {
       toast({
-        title: "Error",
+        title: t("common.error", "Error"),
         description: error instanceof Error ? error.message : "Failed to calculate dosage",
         variant: "destructive",
       })
@@ -318,7 +349,11 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
   const saveDoctorAction = async (tool: "differential" | "interactions" | "literature" | "dosage", summary: string) => {
     const action = doctorActions[tool]
     if (!action?.decision) {
-      toast({ title: "Error", description: "Please select doctor action", variant: "destructive" })
+      toast({
+        title: t("common.error", "Error"),
+        description: t("ct.error.doctorAction", "Please select doctor action"),
+        variant: "destructive",
+      })
       return
     }
 
@@ -339,10 +374,10 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
       const data = await response.json()
       if (!data.success) throw new Error(data.message || "Failed to save decision")
 
-      toast({ title: "Saved", description: "Doctor action logged successfully" })
+      toast({ title: t("ct.saved", "Saved"), description: t("ct.savedDesc", "Doctor action logged successfully") })
     } catch (error) {
       toast({
-        title: "Error",
+        title: t("common.error", "Error"),
         description: error instanceof Error ? error.message : "Failed to save doctor action",
         variant: "destructive",
       })
@@ -357,14 +392,14 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Brain className="w-5 h-5" />
-            AI-Powered Clinical Tools
+            {t("ct.title", "AI-Powered Clinical Tools")}
           </CardTitle>
-          <CardDescription>
-            Advanced clinical decision support powered by AI
-          </CardDescription>
+          <CardDescription>{t("ct.subtitle", "Advanced clinical decision support powered by AI")}</CardDescription>
           <p className="text-xs text-muted-foreground mt-2">
-            Features here support principles in ICMR&apos;s AI ethics framework—clinician confirmation, explainability
-            cues, and auditable doctor decisions—not a claim of formal compliance.
+            {t(
+              "ct.icmrNote",
+              "Features here support principles in ICMR's AI ethics framework—clinician confirmation, explainability cues, and auditable doctor decisions—not a claim of formal compliance.",
+            )}
           </p>
         </CardHeader>
         <CardContent>
@@ -373,8 +408,10 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
             <AlertDescription className="text-sm">
               <div className="space-y-2">
                 <p>
-                  AI outputs are clinical decision support only and must be verified with professional judgment and
-                  current guidelines.
+                  {t(
+                    "ct.aiAssistIntro",
+                    "AI outputs are clinical decision support only and must be verified with professional judgment and current guidelines.",
+                  )}
                 </p>
                 <label className="flex items-start gap-2 cursor-pointer">
                   <input
@@ -384,8 +421,10 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                     onChange={(e) => updateAiConfirm(e.target.checked)}
                   />
                   <span>
-                    I confirm I will use AI suggestions as assistive information, not as the sole basis for diagnosis
-                    or prescribing.
+                    {t(
+                      "ct.aiAssistCheckbox",
+                      "I confirm I will use AI suggestions as assistive information, not as the sole basis for diagnosis or prescribing.",
+                    )}
                   </span>
                 </label>
               </div>
@@ -394,10 +433,10 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
           <Tabs defaultValue="differential" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="differential">Diagnosis</TabsTrigger>
-              <TabsTrigger value="interactions">Interactions</TabsTrigger>
-              <TabsTrigger value="literature">Literature</TabsTrigger>
-              <TabsTrigger value="dosage">Dosage</TabsTrigger>
+              <TabsTrigger value="differential">{t("ct.tab.diagnosis", "Diagnosis")}</TabsTrigger>
+              <TabsTrigger value="interactions">{t("ct.tab.interactions", "Interactions")}</TabsTrigger>
+              <TabsTrigger value="literature">{t("ct.tab.literature", "Literature")}</TabsTrigger>
+              <TabsTrigger value="dosage">{t("ct.tab.dosage", "Dosage")}</TabsTrigger>
             </TabsList>
 
             {/* Differential Diagnosis */}
@@ -405,9 +444,9 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
               <Card className="bg-muted/30">
                 <CardContent className="pt-6">
                   <div className="space-y-3">
-                    <label className="text-sm font-medium">Symptoms (comma-separated)</label>
+                    <label className="text-sm font-medium">{t("ct.symptomsLabel", "Symptoms (comma-separated)")}</label>
                     <Input
-                      placeholder="e.g., Fever, Cough, Fatigue"
+                      placeholder={t("ct.symptomsPh", "e.g., Fever, Cough, Fatigue")}
                       value={symptoms}
                       onChange={(e) => setSymptoms(e.target.value)}
                     />
@@ -415,10 +454,10 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                       {ddLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Analyzing...
+                          {t("ct.analyzing", "Analyzing...")}
                         </>
                       ) : (
-                        "Generate Differential Diagnosis"
+                        t("ct.generateDD", "Generate Differential Diagnosis")
                       )}
                     </Button>
                   </div>
@@ -430,24 +469,25 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                   <Alert variant={ddResult.urgencyLevel === "Emergency" ? "destructive" : "default"}>
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      <strong>Urgency:</strong> {ddResult.urgencyLevel}
+                      <strong>{t("ct.urgency", "Urgency:")}</strong> {ddResult.urgencyLevel}
                     </AlertDescription>
                   </Alert>
 
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">AI Confidence & Rationale</CardTitle>
+                      <CardTitle className="text-sm">{t("ct.aiConfidence", "AI Confidence & Rationale")}</CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm space-y-2">
                       <div className="flex items-center gap-2">
-                        <strong>Confidence:</strong>
+                        <strong>{t("ct.confidence", "Confidence")}:</strong>
                         <Badge className={getConfidenceTone(ddResult.differentialDiagnoses[0]?.probability || "Moderate")}>
                           {ddResult.differentialDiagnoses[0]?.probability || "Moderate"}
                         </Badge>
                       </div>
                       <p>
-                        <strong>Rationale:</strong>{" "}
-                        {ddResult.differentialDiagnoses[0]?.reasoning || "Based on symptom pattern and clinical context."}
+                        <strong>{t("ct.rationale", "Rationale")}:</strong>{" "}
+                        {ddResult.differentialDiagnoses[0]?.reasoning ||
+                          t("ct.ddRationaleFallback", "Based on symptom pattern and clinical context.")}
                       </p>
                     </CardContent>
                   </Card>
@@ -455,7 +495,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                   {ddResult.redFlags.length > 0 && (
                     <Card className="border-red-500">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-sm text-red-600">Red Flags</CardTitle>
+                        <CardTitle className="text-sm text-red-600">{t("ct.redFlags", "Red Flags")}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ul className="list-disc list-inside text-sm space-y-1">
@@ -468,7 +508,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                   )}
 
                   <div className="space-y-3">
-                    <h4 className="font-semibold">Differential Diagnoses:</h4>
+                    <h4 className="font-semibold">{t("ct.diffDxHeading", "Differential Diagnoses:")}</h4>
                     {ddResult.differentialDiagnoses.map((diagnosis, i) => (
                       <Card key={i}>
                         <CardHeader className="pb-3">
@@ -486,7 +526,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                           <p>{diagnosis.reasoning}</p>
                           {diagnosis.recommendedTests.length > 0 && (
                             <div>
-                              <strong>Recommended Tests:</strong>
+                              <strong>{t("ct.recTests", "Recommended Tests")}:</strong>
                               <ul className="list-disc list-inside mt-1">
                                 {diagnosis.recommendedTests.map((test, j) => (
                                   <li key={j}>{test}</li>
@@ -502,7 +542,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                   {ddResult.recommendedActions.length > 0 && (
                     <Card>
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">Recommended Actions</CardTitle>
+                        <CardTitle className="text-sm">{t("ct.recActions", "Recommended Actions")}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ul className="list-disc list-inside text-sm space-y-1">
@@ -516,7 +556,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Doctor Action</CardTitle>
+                      <CardTitle className="text-sm">{t("ct.doctorAction", "Doctor Action")}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <Select
@@ -524,16 +564,16 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                         onValueChange={(value) => updateDoctorAction("differential", { decision: value })}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select action" />
+                          <SelectValue placeholder={t("ct.selectAction", "Select action")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="accepted">Accepted</SelectItem>
-                          <SelectItem value="modified">Modified</SelectItem>
-                          <SelectItem value="rejected">Rejected</SelectItem>
+                          <SelectItem value="accepted">{t("ct.accepted", "Accepted")}</SelectItem>
+                          <SelectItem value="modified">{t("ct.modified", "Modified")}</SelectItem>
+                          <SelectItem value="rejected">{t("ct.rejected", "Rejected")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <Textarea
-                        placeholder="Optional reason or clinical notes"
+                        placeholder={t("ct.doctorActionPh", "Optional reason or clinical notes")}
                         value={doctorActions.differential?.reason || ""}
                         onChange={(e) => updateDoctorAction("differential", { reason: e.target.value })}
                       />
@@ -547,7 +587,9 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                           )
                         }
                       >
-                        {decisionLoading === "differential" ? "Saving..." : "Save Doctor Action"}
+                        {decisionLoading === "differential"
+                          ? t("ct.saving", "Saving...")
+                          : t("ct.saveDoctorAction", "Save Doctor Action")}
                       </Button>
                     </CardContent>
                   </Card>
@@ -560,9 +602,9 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
               <Card className="bg-muted/30">
                 <CardContent className="pt-6">
                   <div className="space-y-3">
-                    <label className="text-sm font-medium">Medications (comma-separated)</label>
+                    <label className="text-sm font-medium">{t("ct.medsLabel", "Medications (comma-separated)")}</label>
                     <Input
-                      placeholder="e.g., Aspirin, Warfarin, Lisinopril"
+                      placeholder={t("ct.medsPh", "e.g., Aspirin, Warfarin, Lisinopril")}
                       value={medications}
                       onChange={(e) => setMedications(e.target.value)}
                     />
@@ -570,10 +612,10 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                       {diLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Checking...
+                          {t("ct.checking", "Checking...")}
                         </>
                       ) : (
-                        "Check Drug Interactions"
+                        t("ct.checkInteractions", "Check Drug Interactions")
                       )}
                     </Button>
                   </div>
@@ -584,31 +626,32 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                 <div className="space-y-4 mt-4">
                   <Alert variant={diResult.overallRisk === "Critical" || diResult.overallRisk === "High" ? "destructive" : "default"}>
                     <AlertDescription>
-                      <strong>Overall Risk:</strong> {diResult.overallRisk}
+                      <strong>{t("ct.overallRiskLabel", "Overall Risk:")}</strong> {diResult.overallRisk}
                     </AlertDescription>
                   </Alert>
 
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">AI Confidence & Rationale</CardTitle>
+                      <CardTitle className="text-sm">{t("ct.aiConfidence", "AI Confidence & Rationale")}</CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm space-y-2">
                       <div className="flex items-center gap-2">
-                        <strong>Confidence:</strong>
+                        <strong>{t("ct.confidence", "Confidence")}:</strong>
                         <Badge className={getConfidenceTone(diResult.hasInteractions ? "High" : "Moderate")}>
                           {diResult.hasInteractions ? "High" : "Moderate"}
                         </Badge>
                       </div>
                       <p>
-                        <strong>Rationale:</strong>{" "}
-                        {diResult.interactions[0]?.description || "No major interaction evidence detected in this check."}
+                        <strong>{t("ct.rationale", "Rationale")}:</strong>{" "}
+                        {diResult.interactions[0]?.description ||
+                          t("ct.interRationaleFallback", "No major interaction evidence detected in this check.")}
                       </p>
                     </CardContent>
                   </Card>
 
                   {diResult.hasInteractions ? (
                     <div className="space-y-3">
-                      <h4 className="font-semibold">Detected Interactions:</h4>
+                      <h4 className="font-semibold">{t("ct.detectedInteractions", "Detected Interactions")}:</h4>
                       {diResult.interactions.map((interaction, i) => (
                         <Card key={i} className="border-orange-500">
                           <CardHeader className="pb-3">
@@ -622,11 +665,15 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                             </div>
                           </CardHeader>
                           <CardContent className="space-y-2 text-sm">
-                            <p><strong>Description:</strong> {interaction.description}</p>
-                            <p><strong>Recommendation:</strong> {interaction.recommendation}</p>
+                            <p>
+                              <strong>{t("ct.descLabel", "Description:")}</strong> {interaction.description}
+                            </p>
+                            <p>
+                              <strong>{t("ct.recLabel", "Recommendation:")}</strong> {interaction.recommendation}
+                            </p>
                             {interaction.alternatives.length > 0 && (
                               <div>
-                                <strong>Alternatives:</strong>
+                                <strong>{t("ct.alternatives", "Alternatives")}:</strong>
                                 <ul className="list-disc list-inside mt-1">
                                   {interaction.alternatives.map((alt, j) => (
                                     <li key={j}>{alt}</li>
@@ -641,14 +688,14 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                   ) : (
                     <Alert>
                       <CheckCircle className="h-4 w-4" />
-                      <AlertDescription>No significant interactions detected</AlertDescription>
+                      <AlertDescription>{t("ct.noInteractions", "No significant interactions detected")}</AlertDescription>
                     </Alert>
                   )}
 
                   {diResult.dosageWarnings.length > 0 && (
                     <Card className="border-yellow-500">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">Dosage Warnings</CardTitle>
+                        <CardTitle className="text-sm">{t("ct.dosageWarnings", "Dosage Warnings")}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ul className="list-disc list-inside text-sm space-y-1">
@@ -663,7 +710,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                   {diResult.patientSpecificWarnings.length > 0 && (
                     <Card className="border-blue-500">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">Patient-Specific Warnings</CardTitle>
+                        <CardTitle className="text-sm">{t("ct.patientWarnings", "Patient-Specific Warnings")}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ul className="list-disc list-inside text-sm space-y-1">
@@ -677,7 +724,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Doctor Action</CardTitle>
+                      <CardTitle className="text-sm">{t("ct.doctorAction", "Doctor Action")}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <Select
@@ -685,16 +732,16 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                         onValueChange={(value) => updateDoctorAction("interactions", { decision: value })}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select action" />
+                          <SelectValue placeholder={t("ct.selectAction", "Select action")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="accepted">Accepted</SelectItem>
-                          <SelectItem value="modified">Modified</SelectItem>
-                          <SelectItem value="rejected">Rejected</SelectItem>
+                          <SelectItem value="accepted">{t("ct.accepted", "Accepted")}</SelectItem>
+                          <SelectItem value="modified">{t("ct.modified", "Modified")}</SelectItem>
+                          <SelectItem value="rejected">{t("ct.rejected", "Rejected")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <Textarea
-                        placeholder="Optional reason or clinical notes"
+                        placeholder={t("ct.doctorActionPh", "Optional reason or clinical notes")}
                         value={doctorActions.interactions?.reason || ""}
                         onChange={(e) => updateDoctorAction("interactions", { reason: e.target.value })}
                       />
@@ -708,7 +755,9 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                           )
                         }
                       >
-                        {decisionLoading === "interactions" ? "Saving..." : "Save Doctor Action"}
+                        {decisionLoading === "interactions"
+                          ? t("ct.saving", "Saving...")
+                          : t("ct.saveDoctorAction", "Save Doctor Action")}
                       </Button>
                     </CardContent>
                   </Card>
@@ -721,9 +770,9 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
               <Card className="bg-muted/30">
                 <CardContent className="pt-6">
                   <div className="space-y-3">
-                    <label className="text-sm font-medium">Search Query</label>
+                    <label className="text-sm font-medium">{t("ct.litQueryLabel", "Search Query")}</label>
                     <Input
-                      placeholder="e.g., Treatment for type 2 diabetes"
+                      placeholder={t("ct.litQueryPh", "e.g., Treatment for type 2 diabetes")}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -733,31 +782,31 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                         onClick={() => setSearchType("research")}
                         size="sm"
                       >
-                        Research
+                        {t("ct.litResearch", "Research")}
                       </Button>
                       <Button
                         variant={searchType === "guidelines" ? "default" : "outline"}
                         onClick={() => setSearchType("guidelines")}
                         size="sm"
                       >
-                        Guidelines
+                        {t("ct.litGuidelines", "Guidelines")}
                       </Button>
                       <Button
                         variant={searchType === "trials" ? "default" : "outline"}
                         onClick={() => setSearchType("trials")}
                         size="sm"
                       >
-                        Trials
+                        {t("ct.litTrials", "Trials")}
                       </Button>
                     </div>
                     <Button onClick={handleLiteratureSearch} disabled={litLoading} className="w-full">
                       {litLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Searching...
+                          {t("ct.searching", "Searching...")}
                         </>
                       ) : (
-                        "Search Literature"
+                        t("ct.searchLit", "Search Literature")
                       )}
                     </Button>
                   </div>
@@ -768,23 +817,26 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                 <div className="space-y-3 mt-4">
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">AI Confidence & Rationale</CardTitle>
+                      <CardTitle className="text-sm">{t("ct.aiConfidence", "AI Confidence & Rationale")}</CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm space-y-2">
                       <div className="flex items-center gap-2">
-                        <strong>Confidence:</strong>
+                        <strong>{t("ct.confidence", "Confidence")}:</strong>
                         <Badge className={getConfidenceTone(litResult.results[0]?.relevance || "Moderate")}>
                           {litResult.results[0]?.relevance || "Moderate"}
                         </Badge>
                       </div>
                       <p>
-                        <strong>Rationale:</strong>{" "}
-                        {litResult.results[0]?.summary || "Based on relevance-ranked literature search results."}
+                        <strong>{t("ct.rationale", "Rationale")}:</strong>{" "}
+                        {litResult.results[0]?.summary ||
+                          t("ct.litRationaleFallback", "Based on relevance-ranked literature search results.")}
                       </p>
                     </CardContent>
                   </Card>
 
-                  <h4 className="font-semibold">Results ({litResult.totalResults}):</h4>
+                  <h4 className="font-semibold">
+                    {t("ct.resultsHeading", "Results ({count}):", { count: String(litResult.totalResults) })}
+                  </h4>
                   {litResult.results.map((result, i) => (
                     <Card key={i}>
                       <CardHeader className="pb-3">
@@ -798,7 +850,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                         <p>{result.summary}</p>
                         {result.keyPoints && result.keyPoints.length > 0 && (
                           <div>
-                            <strong>Key Points:</strong>
+                            <strong>{t("ct.keyPoints", "Key Points")}:</strong>
                             <ul className="list-disc list-inside mt-1">
                               {result.keyPoints.map((point, j) => (
                                 <li key={j}>{point}</li>
@@ -807,7 +859,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                           </div>
                         )}
                         <Badge className={getRiskColor(result.relevance)}>
-                          Relevance: {result.relevance}
+                          {t("ct.relevanceLabel", "Relevance: {rel}", { rel: result.relevance })}
                         </Badge>
                       </CardContent>
                     </Card>
@@ -815,7 +867,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Doctor Action</CardTitle>
+                      <CardTitle className="text-sm">{t("ct.doctorAction", "Doctor Action")}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <Select
@@ -823,16 +875,16 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                         onValueChange={(value) => updateDoctorAction("literature", { decision: value })}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select action" />
+                          <SelectValue placeholder={t("ct.selectAction", "Select action")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="accepted">Accepted</SelectItem>
-                          <SelectItem value="modified">Modified</SelectItem>
-                          <SelectItem value="rejected">Rejected</SelectItem>
+                          <SelectItem value="accepted">{t("ct.accepted", "Accepted")}</SelectItem>
+                          <SelectItem value="modified">{t("ct.modified", "Modified")}</SelectItem>
+                          <SelectItem value="rejected">{t("ct.rejected", "Rejected")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <Textarea
-                        placeholder="Optional reason or clinical notes"
+                        placeholder={t("ct.doctorActionPh", "Optional reason or clinical notes")}
                         value={doctorActions.literature?.reason || ""}
                         onChange={(e) => updateDoctorAction("literature", { reason: e.target.value })}
                       />
@@ -846,7 +898,9 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                           )
                         }
                       >
-                        {decisionLoading === "literature" ? "Saving..." : "Save Doctor Action"}
+                        {decisionLoading === "literature"
+                          ? t("ct.saving", "Saving...")
+                          : t("ct.saveDoctorAction", "Save Doctor Action")}
                       </Button>
                     </CardContent>
                   </Card>
@@ -860,37 +914,37 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                 <CardContent className="pt-6">
                   <div className="space-y-3">
                     <div>
-                      <label className="text-sm font-medium">Medication Name</label>
+                      <label className="text-sm font-medium">{t("ct.medName", "Medication Name")}</label>
                       <Input
-                        placeholder="e.g., Amoxicillin"
+                        placeholder={t("ct.medPh", "e.g., Amoxicillin")}
                         value={dosageMed}
                         onChange={(e) => setDosageMed(e.target.value)}
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-sm font-medium">Age (years)</label>
+                        <label className="text-sm font-medium">{t("ct.age", "Age (years)")}</label>
                         <Input
                           type="number"
-                          placeholder="Age"
+                          placeholder={t("ct.agePh", "Age")}
                           value={dosageAge}
                           onChange={(e) => setDosageAge(e.target.value)}
                         />
                       </div>
                       <div>
-                        <label className="text-sm font-medium">Weight (kg)</label>
+                        <label className="text-sm font-medium">{t("ct.weight", "Weight (kg)")}</label>
                         <Input
                           type="number"
-                          placeholder="Weight"
+                          placeholder={t("ct.weightPh", "Weight")}
                           value={dosageWeight}
                           onChange={(e) => setDosageWeight(e.target.value)}
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="text-sm font-medium">Indication</label>
+                      <label className="text-sm font-medium">{t("ct.indication", "Indication")}</label>
                       <Input
-                        placeholder="e.g., Bacterial infection"
+                        placeholder={t("ct.indicationPh", "e.g., Bacterial infection")}
                         value={dosageIndication}
                         onChange={(e) => setDosageIndication(e.target.value)}
                       />
@@ -899,10 +953,10 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                       {dosageLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Calculating...
+                          {t("ct.calculating", "Calculating...")}
                         </>
                       ) : (
-                        "Calculate Dosage"
+                        t("ct.calcDosage", "Calculate Dosage")
                       )}
                     </Button>
                   </div>
@@ -912,8 +966,8 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
               {dosageLoading && (
                 <Card className="border-emerald-500">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Web Dosage References</CardTitle>
-                    <CardDescription>Searching web for company, dosage, and order links...</CardDescription>
+                    <CardTitle className="text-sm">{t("ct.webRefs", "Web Dosage References")}</CardTitle>
+                    <CardDescription>{t("ct.webRefsSearching", "Searching web for company, dosage, and order links...")}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
@@ -927,45 +981,47 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                 <div className="space-y-3 mt-4">
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">AI Confidence & Rationale</CardTitle>
+                      <CardTitle className="text-sm">{t("ct.aiConfidence", "AI Confidence & Rationale")}</CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm space-y-2">
                       <div className="flex items-center gap-2">
-                        <strong>Confidence:</strong>
+                        <strong>{t("ct.confidence", "Confidence")}:</strong>
                         <Badge className={getConfidenceTone(dosageResult.webSearchResults?.length ? "High" : "Moderate")}>
                           {dosageResult.webSearchResults?.length ? "High" : "Moderate"}
                         </Badge>
                       </div>
                       <p>
-                        <strong>Rationale:</strong>{" "}
-                        Dosage recommendation combines patient age/weight/indication with model inference and available
-                        safety warnings.
+                        <strong>{t("ct.rationale", "Rationale")}:</strong>{" "}
+                        {t(
+                          "ct.dosageAiRationale",
+                          "Dosage recommendation combines patient age/weight/indication with model inference and available safety warnings.",
+                        )}
                       </p>
                     </CardContent>
                   </Card>
 
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Dosage Recommendations</CardTitle>
+                      <CardTitle className="text-sm">{t("ct.dosageRec", "Dosage Recommendations")}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <div>
-                        <strong>Standard Dosage:</strong> {dosageResult.standardDosage}
+                        <strong>{t("ct.standardDose", "Standard Dosage")}:</strong> {dosageResult.standardDosage}
                       </div>
                       <div>
-                        <strong>Adjusted Dosage:</strong> {dosageResult.adjustedDosage}
+                        <strong>{t("ct.adjustedDose", "Adjusted Dosage")}:</strong> {dosageResult.adjustedDosage}
                       </div>
                       <div>
-                        <strong>Frequency:</strong> {dosageResult.frequency}
+                        <strong>{t("ct.frequency", "Frequency")}:</strong> {dosageResult.frequency}
                       </div>
                       {dosageResult.route && (
                         <div>
-                          <strong>Route:</strong> {dosageResult.route}
+                          <strong>{t("ct.route", "Route")}:</strong> {dosageResult.route}
                         </div>
                       )}
                       {dosageResult.duration && (
                         <div>
-                          <strong>Duration:</strong> {dosageResult.duration}
+                          <strong>{t("ct.duration", "Duration")}:</strong> {dosageResult.duration}
                         </div>
                       )}
                     </CardContent>
@@ -974,7 +1030,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                   {dosageResult.warnings.length > 0 && (
                     <Card className="border-red-500">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-sm text-red-600">Warnings</CardTitle>
+                        <CardTitle className="text-sm text-red-600">{t("ct.warnings", "Warnings")}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ul className="list-disc list-inside text-sm space-y-1">
@@ -989,7 +1045,7 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                   {dosageResult.monitoring.length > 0 && (
                     <Card className="border-blue-500">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-sm">Monitoring Parameters</CardTitle>
+                        <CardTitle className="text-sm">{t("ct.monitoring", "Monitoring Parameters")}</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <ul className="list-disc list-inside text-sm space-y-1">
@@ -1011,32 +1067,34 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
 
                   <Card className="border-emerald-500">
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Web Dosage References</CardTitle>
+                      <CardTitle className="text-sm">{t("ct.webRefs", "Web Dosage References")}</CardTitle>
                       <CardDescription>
-                        {dosageResult.webSearchSummary || "Web search was skipped because structured dosage was already available."}
+                        {dosageResult.webSearchSummary || t("ct.webSkipped", "Web search was skipped because structured dosage was already available.")}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
                       {dosageResult.webSearchResults?.length ? (
                         dosageResult.webSearchResults.map((item, index) => (
                           <div key={`${item.orderLink}-${index}`} className="rounded-md border p-3">
-                            <div><strong>Company:</strong> {item.companyName}</div>
-                            <div><strong>Dosage:</strong> {item.dosage}</div>
+                            <div>
+                              <strong>{t("ct.company", "Company")}:</strong> {item.companyName}
+                            </div>
+                            <div>
+                              <strong>{t("ct.tab.dosage", "Dosage")}:</strong> {item.dosage}
+                            </div>
                             <a
                               href={item.orderLink}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="mt-1 inline-flex items-center gap-1 text-primary hover:underline"
                             >
-                              Order / Source Link
+                              {t("ct.orderLink", "Order / Source Link")}
                               <ExternalLink className="h-3 w-3" />
                             </a>
                           </div>
                         ))
                       ) : (
-                        <p className="text-muted-foreground">
-                          No web dosage references found. Add `SERPER_API_KEY` in `.env` to enable web search fallback.
-                        </p>
+                        <p className="text-muted-foreground">{t("ct.webNoRefs", "No web dosage references found.")}</p>
                       )}
                     </CardContent>
                   </Card>
@@ -1044,14 +1102,16 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                   <Alert>
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription className="text-xs">
-                      Precaution: Verify allergy status, renal/hepatic function, pregnancy/lactation status, and
-                      medicine label instructions before finalizing any dosage or order recommendation.
+                      {t(
+                        "ct.dosagePrecaution",
+                        "Precaution: Verify allergy status, renal/hepatic function, pregnancy/lactation status, and medicine label instructions before finalizing any dosage or order recommendation.",
+                      )}
                     </AlertDescription>
                   </Alert>
 
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Doctor Action</CardTitle>
+                      <CardTitle className="text-sm">{t("ct.doctorAction", "Doctor Action")}</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <Select
@@ -1059,16 +1119,16 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                         onValueChange={(value) => updateDoctorAction("dosage", { decision: value })}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select action" />
+                          <SelectValue placeholder={t("ct.selectAction", "Select action")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="accepted">Accepted</SelectItem>
-                          <SelectItem value="modified">Modified</SelectItem>
-                          <SelectItem value="rejected">Rejected</SelectItem>
+                          <SelectItem value="accepted">{t("ct.accepted", "Accepted")}</SelectItem>
+                          <SelectItem value="modified">{t("ct.modified", "Modified")}</SelectItem>
+                          <SelectItem value="rejected">{t("ct.rejected", "Rejected")}</SelectItem>
                         </SelectContent>
                       </Select>
                       <Textarea
-                        placeholder="Optional reason or clinical notes"
+                        placeholder={t("ct.doctorActionPh", "Optional reason or clinical notes")}
                         value={doctorActions.dosage?.reason || ""}
                         onChange={(e) => updateDoctorAction("dosage", { reason: e.target.value })}
                       />
@@ -1077,7 +1137,9 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
                         disabled={decisionLoading === "dosage"}
                         onClick={() => saveDoctorAction("dosage", `${dosageResult.adjustedDosage} | ${dosageResult.frequency}`)}
                       >
-                        {decisionLoading === "dosage" ? "Saving..." : "Save Doctor Action"}
+                        {decisionLoading === "dosage"
+                          ? t("ct.saving", "Saving...")
+                          : t("ct.saveDoctorAction", "Save Doctor Action")}
                       </Button>
                     </CardContent>
                   </Card>
@@ -1091,10 +1153,8 @@ export function ClinicalToolsPanel({ patientContext }: ClinicalToolsPanelProps) 
       <Alert>
         <AlertTriangle className="h-4 w-4" />
         <AlertDescription className="text-xs">
-          <strong>Clinical Decision Support Disclaimer:</strong> These AI-powered tools provide clinical decision
-          support and should not replace professional medical judgment. Always verify recommendations with current
-          clinical guidelines and use your clinical expertise. Where we reference ICMR guidance, we mean alignment with
-          publicly published ethical principles for AI in healthcare—not endorsement or certification by ICMR.
+          <strong>{t("ct.disclaimerStrong", "Clinical Decision Support Disclaimer:")}</strong>{" "}
+          {t("ct.disclaimerBody", "...")}
         </AlertDescription>
       </Alert>
     </div>

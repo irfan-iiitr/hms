@@ -19,6 +19,7 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { TrendingUp, TrendingDown, Minus, Users, Calendar, FileText, Pill, Clock, Star } from "lucide-react"
+import { useI18n } from "@/lib/i18n"
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"]
 
@@ -28,6 +29,8 @@ interface DoctorAnalyticsProps {
 }
 
 export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalyticsProps) {
+  const { t } = useI18n()
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -51,7 +54,7 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
     return (
       <Card>
         <CardContent className="py-8">
-          <p className="text-center text-muted-foreground">No analytics data available</p>
+          <p className="text-center text-muted-foreground">{t("analyticsWidget.noData")}</p>
         </CardContent>
       </Card>
     )
@@ -93,13 +96,17 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
         {/* Total Patients */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Patients</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("analyticsWidget.totalPatients")}
+            </CardTitle>
             <Users className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{patientStats.totalPatients}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {patientStats.newPatientsMonth} new this month
+              {t("analyticsWidget.newThisMonth", undefined, {
+                count: String(patientStats.newPatientsMonth),
+              })}
             </p>
           </CardContent>
         </Card>
@@ -107,7 +114,9 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
         {/* Appointments This Month */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Appointments (Month)</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("analyticsWidget.appointmentsMonth")}
+            </CardTitle>
             <Calendar className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -115,7 +124,9 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
             <div className="flex items-center gap-2 mt-1">
               {trends.appointments && renderTrendIcon(trends.appointments.trend)}
               <p className="text-xs text-muted-foreground">
-                {trends.appointments?.percentage || 0}% vs last month
+                {t("analyticsWidget.vsLastMonth", undefined, {
+                  pct: String(trends.appointments?.percentage || 0),
+                })}
               </p>
             </div>
           </CardContent>
@@ -124,13 +135,17 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
         {/* Medical Records */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Records Created</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("analyticsWidget.recordsCreated")}
+            </CardTitle>
             <FileText className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{medicalInsights.totalRecords}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {performanceMetrics.totalRecordsMonth} this month
+              {t("analyticsWidget.thisMonth", undefined, {
+                count: String(performanceMetrics.totalRecordsMonth),
+              })}
             </p>
           </CardContent>
         </Card>
@@ -138,13 +153,17 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
         {/* Prescriptions */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Prescriptions</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("analyticsWidget.prescriptions")}
+            </CardTitle>
             <Pill className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{medicalInsights.totalPrescriptions}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {performanceMetrics.totalPrescriptionsMonth} this month
+              {t("analyticsWidget.thisMonth", undefined, {
+                count: String(performanceMetrics.totalPrescriptionsMonth),
+              })}
             </p>
           </CardContent>
         </Card>
@@ -154,45 +173,56 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Daily Consultations</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("analyticsWidget.dailyConsultations")}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{performanceMetrics.consultationsPerDay}</div>
-            <p className="text-xs text-muted-foreground mt-1">Average per day</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("analyticsWidget.avgPerDay")}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Completion Rate</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("analyticsWidget.completionRate")}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{appointmentAnalytics.completionRate}%</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {appointmentAnalytics.completed} of {appointmentAnalytics.total} appointments
+              {t("analyticsWidget.appointmentsOfTotal", undefined, {
+                completed: String(appointmentAnalytics.completed),
+                total: String(appointmentAnalytics.total),
+              })}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Response Time</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("analyticsWidget.avgResponseTime")}
+            </CardTitle>
             <Clock className="w-4 h-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{performanceMetrics.averageResponseTime}</div>
-            <p className="text-xs text-muted-foreground mt-1">To patient queries</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("analyticsWidget.toPatientQueries")}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Patient Satisfaction</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              {t("analyticsWidget.patientSatisfaction")}
+            </CardTitle>
             <Star className="w-4 h-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{performanceMetrics.patientSatisfaction}/5.0</div>
-            <p className="text-xs text-muted-foreground mt-1">Average rating</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("analyticsWidget.avgRating")}</p>
           </CardContent>
         </Card>
       </div>
@@ -202,8 +232,8 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
         {/* Gender Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle>Gender Distribution</CardTitle>
-            <CardDescription>Patient demographics by gender</CardDescription>
+            <CardTitle>{t("analyticsWidget.genderDistribution")}</CardTitle>
+            <CardDescription>{t("analyticsWidget.demographicsByGender")}</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -231,8 +261,8 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
         {/* Age Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle>Age Distribution</CardTitle>
-            <CardDescription>Patient demographics by age group</CardDescription>
+            <CardTitle>{t("analyticsWidget.ageDistribution")}</CardTitle>
+            <CardDescription>{t("analyticsWidget.demographicsByAge")}</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -253,8 +283,10 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
         {/* Peak Hours */}
         <Card>
           <CardHeader>
-            <CardTitle>Appointment Distribution by Hour</CardTitle>
-            <CardDescription>Peak hours: {appointmentAnalytics.peakHour}</CardDescription>
+            <CardTitle>{t("analyticsWidget.apptByHour")}</CardTitle>
+            <CardDescription>
+              {t("analyticsWidget.peakHours", undefined, { hour: String(appointmentAnalytics.peakHour) })}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -272,8 +304,10 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
         {/* Peak Days */}
         <Card>
           <CardHeader>
-            <CardTitle>Appointment Distribution by Day</CardTitle>
-            <CardDescription>Peak day: {appointmentAnalytics.peakDay}</CardDescription>
+            <CardTitle>{t("analyticsWidget.apptByDay")}</CardTitle>
+            <CardDescription>
+              {t("analyticsWidget.peakDay", undefined, { day: String(appointmentAnalytics.peakDay) })}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -292,13 +326,13 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
       {/* Appointment Status Breakdown */}
       <Card>
         <CardHeader>
-          <CardTitle>Appointment Status Overview</CardTitle>
-          <CardDescription>Current month statistics</CardDescription>
+          <CardTitle>{t("analyticsWidget.apptStatusOverview")}</CardTitle>
+          <CardDescription>{t("analyticsWidget.currentMonthStats")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Completed</p>
+              <p className="text-sm text-muted-foreground">{t("analyticsWidget.completed")}</p>
               <div className="flex items-center gap-2">
                 <div className="text-2xl font-bold">{appointmentAnalytics.completed}</div>
                 <Badge variant="outline" className="bg-green-500/10 text-green-700 border-green-500/20">
@@ -307,11 +341,11 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
               </div>
             </div>
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Scheduled</p>
+              <p className="text-sm text-muted-foreground">{t("analyticsWidget.scheduled")}</p>
               <div className="text-2xl font-bold">{appointmentAnalytics.scheduled}</div>
             </div>
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Cancelled</p>
+              <p className="text-sm text-muted-foreground">{t("analyticsWidget.cancelled")}</p>
               <div className="flex items-center gap-2">
                 <div className="text-2xl font-bold">{appointmentAnalytics.cancelled}</div>
                 <Badge variant="outline" className="bg-red-500/10 text-red-700 border-red-500/20">
@@ -320,7 +354,7 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
               </div>
             </div>
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">No-Show Rate</p>
+              <p className="text-sm text-muted-foreground">{t("analyticsWidget.noShowRate")}</p>
               <div className="flex items-center gap-2">
                 <div className="text-2xl font-bold">{appointmentAnalytics.noShowRate}%</div>
               </div>
@@ -330,7 +364,7 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
           {/* Cancellation Reasons */}
           {Object.keys(appointmentAnalytics.cancellationReasons).length > 0 && (
             <div className="mt-6">
-              <h4 className="text-sm font-medium mb-3">Cancellation Reasons</h4>
+              <h4 className="text-sm font-medium mb-3">{t("analyticsWidget.cancellationReasons")}</h4>
               <div className="space-y-2">
                 {Object.entries(appointmentAnalytics.cancellationReasons)
                   .slice(0, 5)
@@ -351,8 +385,8 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
         {/* Top Diagnoses */}
         <Card>
           <CardHeader>
-            <CardTitle>Most Common Diagnoses</CardTitle>
-            <CardDescription>Top 5 diagnoses</CardDescription>
+            <CardTitle>{t("analyticsWidget.mostCommonDiagnoses")}</CardTitle>
+            <CardDescription>{t("analyticsWidget.top5Diagnoses")}</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -370,8 +404,8 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
         {/* Top Medications */}
         <Card>
           <CardHeader>
-            <CardTitle>Most Prescribed Medications</CardTitle>
-            <CardDescription>Top 5 medications</CardDescription>
+            <CardTitle>{t("analyticsWidget.mostPrescribedMeds")}</CardTitle>
+            <CardDescription>{t("analyticsWidget.top5Medications")}</CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -390,8 +424,8 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
       {/* Seasonal Trends */}
       <Card>
         <CardHeader>
-          <CardTitle>Diagnosis Trends (Last 6 Months)</CardTitle>
-          <CardDescription>Monthly diagnosis patterns</CardDescription>
+          <CardTitle>{t("analyticsWidget.diagnosisTrends6m")}</CardTitle>
+          <CardDescription>{t("analyticsWidget.monthlyDiagnosisPatterns")}</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
@@ -401,20 +435,28 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
               <YAxis />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="diagnoses" stroke="#3b82f6" strokeWidth={2} />
+              <Line
+                type="monotone"
+                dataKey="diagnoses"
+                name={t("analyticsWidget.legendDiagnoses")}
+                stroke="#3b82f6"
+                strokeWidth={2}
+              />
             </LineChart>
           </ResponsiveContainer>
 
           {/* Show top diagnosis per month */}
           <div className="mt-6">
-            <h4 className="text-sm font-medium mb-3">Top Diagnosis by Month</h4>
+            <h4 className="text-sm font-medium mb-3">{t("analyticsWidget.topDiagnosisByMonth")}</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {medicalInsights.seasonalTrends.map((trend) => (
                 <div key={trend.month} className="space-y-1">
                   <p className="text-xs text-muted-foreground">{trend.month}</p>
                   <p className="text-sm font-medium">{trend.topDiagnosis}</p>
                   <Badge variant="outline" className="text-xs">
-                    {trend.totalDiagnoses} cases
+                    {t("analyticsWidget.casesCount", undefined, {
+                      count: String(trend.totalDiagnoses),
+                    })}
                   </Badge>
                 </div>
               ))}
@@ -426,45 +468,53 @@ export function DoctorAnalyticsComponent({ analytics, loading }: DoctorAnalytics
       {/* Patient Flow */}
       <Card>
         <CardHeader>
-          <CardTitle>Patient Flow</CardTitle>
-          <CardDescription>New vs returning patients this month</CardDescription>
+          <CardTitle>{t("analyticsWidget.patientFlow")}</CardTitle>
+          <CardDescription>{t("analyticsWidget.newVsReturning")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Total Patients Seen</p>
+              <p className="text-sm text-muted-foreground">{t("analyticsWidget.totalPatientsSeen")}</p>
               <div className="text-3xl font-bold">{patientStats.monthly}</div>
             </div>
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">New Patients</p>
+              <p className="text-sm text-muted-foreground">{t("analyticsWidget.newPatients")}</p>
               <div className="text-3xl font-bold text-blue-600">{patientStats.newPatientsMonth}</div>
               <p className="text-xs text-muted-foreground">
-                {patientStats.monthly > 0
-                  ? ((patientStats.newPatientsMonth / patientStats.monthly) * 100).toFixed(1)
-                  : 0}
-                % of total
+                {t("analyticsWidget.pctOfTotal", undefined, {
+                  pct:
+                    patientStats.monthly > 0
+                      ? ((patientStats.newPatientsMonth / patientStats.monthly) * 100).toFixed(1)
+                      : "0",
+                })}
               </p>
             </div>
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Returning Patients</p>
+              <p className="text-sm text-muted-foreground">{t("analyticsWidget.returningPatients")}</p>
               <div className="text-3xl font-bold text-green-600">{patientStats.returningPatientsMonth}</div>
               <p className="text-xs text-muted-foreground">
-                {patientStats.monthly > 0
-                  ? ((patientStats.returningPatientsMonth / patientStats.monthly) * 100).toFixed(1)
-                  : 0}
-                % of total
+                {t("analyticsWidget.pctOfTotal", undefined, {
+                  pct:
+                    patientStats.monthly > 0
+                      ? ((patientStats.returningPatientsMonth / patientStats.monthly) * 100).toFixed(1)
+                      : "0",
+                })}
               </p>
             </div>
           </div>
 
           <div className="mt-6 space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">This week</span>
-              <span className="font-medium">{patientStats.weekly} patients</span>
+              <span className="text-muted-foreground">{t("analyticsWidget.thisWeek")}</span>
+              <span className="font-medium">
+                {t("analyticsWidget.patientsCount", undefined, { count: String(patientStats.weekly) })}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Today</span>
-              <span className="font-medium">{patientStats.daily} patients</span>
+              <span className="text-muted-foreground">{t("analyticsWidget.today")}</span>
+              <span className="font-medium">
+                {t("analyticsWidget.patientsCount", undefined, { count: String(patientStats.daily) })}
+              </span>
             </div>
           </div>
         </CardContent>

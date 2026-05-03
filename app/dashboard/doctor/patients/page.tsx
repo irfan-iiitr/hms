@@ -10,9 +10,11 @@ import { fetchPatients, fetchMedicalRecordsByPatient } from "@/lib/api"
 import type { User } from "@/lib/types"
 import { Search, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { useI18n } from "@/lib/i18n"
 
 export default function DoctorPatientsPage() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [patients, setPatients] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState("")
 
@@ -53,8 +55,8 @@ export default function DoctorPatientsPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-balance">My Patients</h1>
-              <p className="text-muted-foreground">Manage your patient list</p>
+              <h1 className="text-3xl font-bold text-balance">{t("doc.myPatients", "My Patients")}</h1>
+              <p className="text-muted-foreground">{t("doc.myPatientsSubtitle", "Manage your patient list")}</p>
             </div>
           </div>
 
@@ -64,7 +66,7 @@ export default function DoctorPatientsPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name or email..."
+                  placeholder={t("doc.searchPatientsPlaceholder", "Search by name or email...")}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -78,7 +80,7 @@ export default function DoctorPatientsPage() {
             {filteredPatients.length === 0 ? (
               <Card className="col-span-full">
                 <CardContent className="pt-6">
-                  <p className="text-center text-muted-foreground">No patients found</p>
+                  <p className="text-center text-muted-foreground">{t("doc.noPatients")}</p>
                 </CardContent>
               </Card>
             ) : (
@@ -95,11 +97,11 @@ export default function DoctorPatientsPage() {
                       <CardContent>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Medical Records:</span>
+                            <span className="text-muted-foreground">{t("doc.recordsLabel")}</span>
                             <span className="font-semibold">{recordCount}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Member Since:</span>
+                            <span className="text-muted-foreground">{t("doc.memberSince")}</span>
                             <span className="font-semibold">{new Date(patient.createdAt).toLocaleDateString()}</span>
                           </div>
                         </div>

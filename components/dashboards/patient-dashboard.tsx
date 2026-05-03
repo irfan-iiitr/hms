@@ -23,8 +23,10 @@ import {
   PrescriptionsListSkeleton, 
   AppointmentsListSkeleton 
 } from "@/components/ui/loading-skeletons"
+import { useI18n } from "@/lib/i18n"
 
 export default function PatientDashboard() {
+  const { t } = useI18n()
   // Upload modal state and handlers
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -117,7 +119,7 @@ export default function PatientDashboard() {
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedFile) {
-      setUploadError("Please select a file to upload.")
+      setUploadError(t("pat.uploadSelectFile", "Please select a file to upload."))
       return
     }
     setUploading(true)
@@ -202,8 +204,8 @@ export default function PatientDashboard() {
       } catch (error) {
         console.error("[PatientDashboard] Failed to load data", error)
         toast({ 
-          title: "Error loading data", 
-          description: "Failed to load your medical data. Please try refreshing the page.",
+          title: t("pat.errorLoadingData", "Error loading data"), 
+          description: t("pat.errorLoadingDataDesc", "Failed to load your medical data. Please try refreshing the page."),
           variant: "destructive"
         })
       } finally {
@@ -251,8 +253,8 @@ export default function PatientDashboard() {
         setProfileSaved(true)
         setShowProfileForm(false)
         toast({ 
-          title: "✅ Profile updated", 
-          description: "Your medical information has been successfully saved."
+          title: t("pat.profileUpdated", "Profile updated"), 
+          description: t("pat.profileUpdatedDesc", "Your medical information has been successfully saved.")
         })
       } catch (err) {
         console.warn("[PatientDashboard] server update failed, falling back to local storage", err)
@@ -263,15 +265,15 @@ export default function PatientDashboard() {
         setProfileSaved(true)
         setShowProfileForm(false)
         toast({ 
-          title: "✅ Profile saved", 
-          description: "Saved to local storage."
+          title: t("pat.profileSavedLocal", "Profile saved"), 
+          description: t("pat.profileSavedLocalDesc", "Saved to local storage.")
         })
       }
     } catch (error) {
       console.error("[PatientDashboard] Failed to save profile", error)
       toast({ 
-        title: "❌ Error", 
-        description: "Failed to save profile. Please try again.",
+        title: t("pat.profileError", "Error"), 
+        description: t("pat.profileErrorDesc", "Failed to save profile. Please try again."),
         variant: "destructive"
       })
     } finally {
@@ -288,24 +290,28 @@ export default function PatientDashboard() {
         {/* Header with logout */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-balance">Welcome back, {user?.name}</h1>
+            <h1 className="text-4xl font-bold text-balance">
+              {t("common.welcomeBack", "Welcome back, {name}", { name: user?.name || "" })}
+            </h1>
             <p className="text-muted-foreground mt-2 flex items-center gap-3">
-              <span>Manage your health records and appointments</span>
+              <span>{t("common.manageHealthSubtitle", "Manage your health records and appointments")}</span>
               {((user as any)?.bloodGroup || null) && (
-                <span className="text-sm px-2 py-1 rounded-md bg-muted/60 text-foreground">Blood: {(user as any).bloodGroup}</span>
+                <span className="text-sm px-2 py-1 rounded-md bg-muted/60 text-foreground">
+                  {t("common.blood", "Blood")}: {(user as any).bloodGroup}
+                </span>
               )}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={handleOpenProfile} variant="secondary" size="lg" className="gap-2">
-              Update Profile
+              {t("common.updateProfile", "Update Profile")}
             </Button>
             <Button onClick={() => setShowUploadForm(true)} variant="secondary" size="lg" className="gap-2">
-              Upload Medical Files
+              {t("common.uploadMedicalFiles", "Upload Medical Files")}
             </Button>
             <Button onClick={handleLogout} variant="outline" size="lg" className="gap-2 bg-transparent">
               <LogOut className="w-4 h-4" />
-              Logout
+              {t("common.logout", "Logout")}
             </Button>
           </div>
         </div>
@@ -319,13 +325,13 @@ export default function PatientDashboard() {
               <Card className="hover:shadow-lg transition-all cursor-pointer hover:border-primary/50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-                    <span>Medical Records</span>
+                    <span>{t("common.medicalRecords", "Medical Records")}</span>
                     <FileText className="w-4 h-4" />
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{records.length}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Click to view all</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("common.clickToViewAll", "Click to view all")}</p>
                 </CardContent>
               </Card>
             </Link>
@@ -334,13 +340,13 @@ export default function PatientDashboard() {
               <Card className="hover:shadow-lg transition-all cursor-pointer hover:border-primary/50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-                    <span>Active Prescriptions</span>
+                    <span>{t("common.activePrescriptions", "Active Prescriptions")}</span>
                     <Pill className="w-4 h-4" />
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{prescriptions.length}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Click to view all</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("common.clickToViewAll", "Click to view all")}</p>
                 </CardContent>
               </Card>
             </Link>
@@ -349,13 +355,13 @@ export default function PatientDashboard() {
               <Card className="hover:shadow-lg transition-all cursor-pointer hover:border-primary/50">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
-                    <span>Upcoming</span>
+                    <span>{t("common.upcoming", "Upcoming")}</span>
                     <Calendar className="w-4 h-4" />
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{upcomingAppointments}</div>
-                  <p className="text-xs text-muted-foreground mt-1">Appointments</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t("common.appointments", "Appointments")}</p>
                 </CardContent>
               </Card>
             </Link>
@@ -384,8 +390,8 @@ export default function PatientDashboard() {
                   fetchAppointmentsByPatient(patientId).then(setAppointments)
                 }
                 toast({
-                  title: "Appointment cancelled",
-                  description: "Your appointment has been cancelled successfully.",
+                  title: t("pat.appointmentCancelled", "Appointment cancelled"),
+                  description: t("pat.appointmentCancelledDesc", "Your appointment has been cancelled successfully."),
                 })
               }}
             />
@@ -406,9 +412,11 @@ export default function PatientDashboard() {
               <form onSubmit={handleUploadSubmit} className="space-y-4">
                 <div className="flex items-center gap-2 mb-2">
                   <UploadCloud className="w-6 h-6 text-primary" />
-                  <h2 className="text-lg font-semibold">Upload Medical File</h2>
+                  <h2 className="text-lg font-semibold">{t("pat.uploadTitle", "Upload Medical File")}</h2>
                 </div>
-                <p className="text-sm text-muted-foreground mb-2">Upload images of medical tests, results, etc. (JPG, PNG, PDF)</p>
+                <p className="text-sm text-muted-foreground mb-2">
+                  {t("pat.uploadHint", "Upload images of medical tests, results, etc. (JPG, PNG, PDF)")}
+                </p>
                 <input
                   type="file"
                   accept="image/*,application/pdf"
@@ -417,32 +425,34 @@ export default function PatientDashboard() {
                   disabled={uploading}
                 />
                 <div>
-                  <label className="text-xs font-medium block mb-1">Category</label>
+                  <label className="text-xs font-medium block mb-1">{t("pat.category", "Category")}</label>
                   <select
                     value={fileCategory}
                     onChange={(e) => setFileCategory(e.target.value)}
                     className="w-full border rounded px-2 py-1 text-sm bg-background"
                     disabled={uploading}
                   >
-                    <option value="lab_result">Lab Result</option>
-                    <option value="imaging">Imaging / Scan</option>
-                    <option value="prescription">Prescription</option>
-                    <option value="referral">Referral</option>
-                    <option value="insurance">Insurance</option>
-                    <option value="other">Other</option>
+                    <option value="lab_result">{t("pat.cat.lab", "Lab Result")}</option>
+                    <option value="imaging">{t("pat.cat.imaging", "Imaging / Scan")}</option>
+                    <option value="prescription">{t("pat.cat.prescription", "Prescription")}</option>
+                    <option value="referral">{t("pat.cat.referral", "Referral")}</option>
+                    <option value="insurance">{t("pat.cat.insurance", "Insurance")}</option>
+                    <option value="other">{t("pat.cat.other", "Other")}</option>
                   </select>
                 </div>
                 {selectedFile && (
-                  <div className="text-xs mt-1">Selected: {selectedFile.name}</div>
+                  <div className="text-xs mt-1">
+                    {t("pat.selectedFile", "Selected")}: {selectedFile.name}
+                  </div>
                 )}
                 {uploadError && <div className="text-red-500 text-xs">{uploadError}</div>}
                 <div className="flex gap-2 mt-4">
                   <Button type="submit" disabled={uploading} className="gap-2">
                     <UploadCloud className="w-4 h-4" />
-                    {uploading ? "Uploading..." : "Upload"}
+                    {uploading ? t("common.uploading", "Uploading...") : t("common.upload", "Upload")}
                   </Button>
                   <Button type="button" variant="outline" onClick={handleUploadClose} disabled={uploading}>
-                    Cancel
+                    {t("common.cancel", "Cancel")}
                   </Button>
                 </div>
               </form>

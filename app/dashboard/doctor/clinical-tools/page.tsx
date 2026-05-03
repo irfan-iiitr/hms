@@ -8,9 +8,11 @@ import { ClinicalToolsPanel } from "@/components/clinical-tools-panel"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
+import { useI18n } from "@/lib/i18n"
 
 export default function ClinicalToolsPage() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const params = useParams()
   const patientId = params.patientId as string | undefined
 
@@ -52,21 +54,24 @@ export default function ClinicalToolsPage() {
               </Button>
             </Link>
             <div>
-              <h1 className="text-4xl font-bold">AI Clinical Tools</h1>
+              <h1 className="text-4xl font-bold">{t("clinicalPage.title", "AI Clinical Tools")}</h1>
               <p className="text-muted-foreground mt-2">
-                Advanced clinical decision support powered by AI
+                {t("clinicalPage.subtitle", "Advanced clinical decision support powered by AI")}
               </p>
               <p className="text-xs text-muted-foreground mt-2 max-w-2xl">
-                Workflow features (human oversight, rationale, doctor action logging) are designed to align with{" "}
+                {t(
+                  "clinicalPage.icmrLine",
+                  "Workflow features (human oversight, rationale, doctor action logging) are designed to align with",
+                )}{" "}
                 <a
                   href="https://ethics.ncdirindia.org/ICMR_Ethical_Guidelines.aspx"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline underline-offset-2 hover:text-foreground"
                 >
-                  ICMR ethical guidance on AI in biomedical research and healthcare
+                  {t("clinicalPage.icmrLink", "ICMR ethical guidance on AI in biomedical research and healthcare")}
                 </a>
-                . This is not a regulatory certification.
+                {t("clinicalPage.icmrDisclaimer", ". This is not a regulatory certification.")}
               </p>
             </div>
           </div>

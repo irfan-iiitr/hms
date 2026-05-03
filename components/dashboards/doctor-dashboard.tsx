@@ -14,12 +14,24 @@ import {
 } from "@/lib/api"
 import { fetchUserById } from "@/lib/get-user"
 import type { MedicalRecord, Appointment, User, Prescription } from "@/lib/types"
-import { Stethoscope, Calendar, Users, LogOut, Pill, BarChart3, Brain, Image as ImageIcon } from "lucide-react"
+import {
+  Stethoscope,
+  Calendar,
+  Users,
+  LogOut,
+  Pill,
+  BarChart3,
+  Brain,
+  Image as ImageIcon,
+  ScanLine,
+} from "lucide-react"
 import Link from "next/link"
+import { useI18n } from "@/lib/i18n"
 
 
 export default function DoctorDashboard() {
   const { user, logout, updateProfile } = useAuth()
+  const { t } = useI18n()
   const router = useRouter()
   const [records, setRecords] = useState<MedicalRecord[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
@@ -143,37 +155,43 @@ export default function DoctorDashboard() {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold text-balance">{user?.name}</h1>
-            <p className="text-muted-foreground mt-2">Manage patients and prescriptions</p>
+            <p className="text-muted-foreground mt-2">{t("doc.managePatientsSubtitle", "Manage patients and prescriptions")}</p>
           </div>
           <div className="flex gap-2">
             <Link href="/dashboard/doctor/clinical-tools">
               <Button variant="outline" size="lg" className="gap-2 bg-transparent">
                 <Brain className="w-4 h-4" />
-                AI Tools
+                {t("doc.aiTools", "AI Tools")}
               </Button>
             </Link>
             <Link href="/dashboard/doctor/image-analysis">
               <Button variant="outline" size="lg" className="gap-2 bg-transparent">
                 <ImageIcon className="w-4 h-4" />
-                Image Analysis
+                {t("doc.imageAnalysis", "Image Analysis")}
+              </Button>
+            </Link>
+            <Link href="/dashboard/doctor/image-analysis/mri">
+              <Button variant="outline" size="lg" className="gap-2 bg-transparent">
+                <ScanLine className="w-4 h-4" />
+                {t("doc.mriExaminer", "MRI Examiner")}
               </Button>
             </Link>
             <Link href="/dashboard/doctor/analytics">
               <Button variant="outline" size="lg" className="gap-2 bg-transparent">
                 <BarChart3 className="w-4 h-4" />
-                Analytics
+                {t("doc.analytics", "Analytics")}
               </Button>
             </Link>
             <Button onClick={handleLogout} variant="outline" size="lg" className="gap-2 bg-transparent">
               <LogOut className="w-4 h-4" />
-              Logout
+              {t("common.logout", "Logout")}
             </Button>
           </div>
         </div>
 
         {/* Doctor Availability Slots */}
         <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-2">Set Your Available Time Slots</h2>
+          <h2 className="text-lg font-semibold mb-2">{t("doc.availabilityTitle", "Set Your Available Time Slots")}</h2>
           <div className="flex flex-wrap gap-2">
             {timeSlots.map((slot) => (
               <button
@@ -191,8 +209,13 @@ export default function DoctorDashboard() {
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground mt-2">Click a time to toggle your availability. Green = available, Red = unavailable.</p>
-          {savingSlots && <p className="text-xs text-primary mt-1">Saving...</p>}
+          <p className="text-xs text-muted-foreground mt-2">
+            {t(
+              "doc.availabilityHint",
+              "Click a time to toggle your availability. Green = available, Red = unavailable.",
+            )}
+          </p>
+          {savingSlots && <p className="text-xs text-primary mt-1">{t("doc.saving", "Saving...")}</p>}
         </div>
 
         {/* Stats */}

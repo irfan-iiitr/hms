@@ -24,12 +24,15 @@ import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { FullPageLoader } from "@/components/ui/full-page-loader"
+import { useI18n } from "@/lib/i18n"
 
 export default function PatientDetailPage() {
   const { user } = useAuth()
   const params = useParams()
   const patientId = params.id as string
   const { toast } = useToast()
+  const { t, language } = useI18n()
+  const dateLocale = language === "hi" ? "hi-IN" : "en-US"
 
   const [patient, setPatient] = useState<User | null>(null)
   const [records, setRecords] = useState<MedicalRecord[]>([])
@@ -115,7 +118,7 @@ export default function PatientDetailPage() {
     const doctorId = user?.id || (user as any)?._id?.toString?.() || selectedDoctorId
     console.log("[DoctorPatientPage] Adding record", { patientId, doctorId, diagnosis })
     if (!doctorId || !diagnosis) {
-      setError("Missing required information. Please complete all fields.")
+      setError(t("docPatient.missingFieldsComplete"))
       return
     }
 
@@ -160,8 +163,8 @@ export default function PatientDetailPage() {
     }
 
     toast({
-      title: "Voice notes processed",
-      description: "Medical information extracted and added to form",
+      title: t("docPatient.voiceProcessedTitle"),
+      description: t("docPatient.voiceProcessedDesc"),
     })
     setShowVoiceRecorder(false)
   }
@@ -189,21 +192,23 @@ export default function PatientDetailPage() {
       // Show warning if interactions found
       if (data.hasInteractions) {
         toast({
-          title: "⚠️ Drug Interactions Detected",
-          description: `Found ${data.interactions.length} potential interaction(s). Review before prescribing.`,
+          title: t("docPatient.interactionsDetectedTitle"),
+          description: t("docPatient.interactionsDetectedDesc", undefined, {
+            count: String(data.interactions.length),
+          }),
           variant: "destructive",
         })
       } else {
         toast({
-          title: "✓ No Interactions",
-          description: "No known drug interactions detected",
+          title: t("docPatient.noInteractionsTitle"),
+          description: t("docPatient.noInteractionsDesc"),
         })
       }
     } catch (error) {
       console.error("Failed to check drug interactions:", error)
       toast({
-        title: "Interaction check failed",
-        description: "Could not verify drug interactions. Please review manually.",
+        title: t("docPatient.interactionCheckFailedTitle"),
+        description: t("docPatient.interactionCheckFailedDesc"),
         variant: "destructive",
       })
     } finally {
@@ -216,7 +221,7 @@ export default function PatientDetailPage() {
     const doctorId = user?.id || (user as any)?._id?.toString?.() || selectedDoctorId
     console.log("[DoctorPatientPage] Adding prescription", { patientId, doctorId, recordCount: records.length })
     if (!doctorId || !records.length) {
-      setError("Create a medical record first before adding a prescription.")
+      setError(t("docPatient.createRecordFirst"))
       return
     }
 
@@ -247,7 +252,7 @@ export default function PatientDetailPage() {
   if (isLoadingPatient) {
     return (
       <ProtectedRoute>
-        <FullPageLoader message="Loading patient..." />
+        <FullPageLoader message={t("docPatient.loadingPatient")} />
       </ProtectedRoute>
     )
   }
@@ -260,15 +265,13 @@ export default function PatientDetailPage() {
             <div className="mx-auto h-16 w-16 rounded-full bg-muted flex items-center justify-center">
               <AlertTriangle className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h2 className="text-xl font-semibold">Patient not found</h2>
-            <p className="text-muted-foreground text-sm max-w-sm">
-              The patient record you're looking for doesn't exist or may have been removed.
-            </p>
+            <h2 className="text-xl font-semibold">{t("docPatient.notFoundTitle")}</h2>
+            <p className="text-muted-foreground text-sm max-w-sm">{t("docPatient.notFoundDesc")}</p>
             <div className="pt-2">
               <Link href="/dashboard/doctor/patients">
                 <Button variant="outline" className="gap-2">
                   <ArrowLeft className="w-4 h-4" />
-                  Back to patients
+                  {t("docPatient.backToPatients")}
                 </Button>
               </Link>
             </div>
@@ -299,7 +302,7 @@ export default function PatientDetailPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Medical Records</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t("common.medicalRecords")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{records.length}</div>
@@ -307,7 +310,7 @@ export default function PatientDetailPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Prescriptions</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t("rx.title")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{prescriptions.length}</div>
@@ -317,16 +320,16 @@ export default function PatientDetailPage() {
               <Card className="relative overflow-hidden group">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2 text-muted-foreground">
-                    <span>AI Treatment Assistant</span>
+                    <span>{t("docPatient.aiTreatmentTitle")}</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-xs text-muted-foreground mb-3 leading-relaxed">
-                    Generate context-aware treatment suggestions and ask follow-up questions using the patient's records.
+                    {t("docPatient.aiTreatmentDesc")}
                   </p>
                   <Link href={`/dashboard/doctor/patient/${patientId}/ai-suggestions`}>
                     <Button size="sm" variant="outline" className="gap-2 w-full bg-transparent">
-                      Open Assistant
+                      {t("docPatient.openAssistant")}
                     </Button>
                   </Link>
                 </CardContent>
@@ -358,16 +361,14 @@ export default function PatientDetailPage() {
                         <Brain className="w-6 h-6 text-primary" />
                       </div>
                       <div>
-                        <h3 className="font-semibold">AI Clinical Decision Support</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Differential diagnosis, drug interactions, literature search, and more
-                        </p>
+                        <h3 className="font-semibold">{t("docPatient.aiToolsTitle")}</h3>
+                        <p className="text-sm text-muted-foreground">{t("docPatient.aiToolsDesc")}</p>
                       </div>
                     </div>
                     <Link href={`/dashboard/doctor/clinical-tools?patientId=${patientId}`}>
                       <Button className="gap-2">
                         <Brain className="w-4 h-4" />
-                        Open AI Tools
+                        {t("docPatient.openAiTools")}
                       </Button>
                     </Link>
                   </div>
@@ -379,26 +380,26 @@ export default function PatientDetailPage() {
           {/* Patient Profile Overview */}
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Patient Profile</CardTitle>
+              <CardTitle>{t("docPatient.profileTitle")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground">Blood Group</p>
+                  <p className="text-muted-foreground">{t("docPatient.bloodGroup")}</p>
                   <p className="font-medium">{(patient as any)?.bloodGroup || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Allergies</p>
+                  <p className="text-muted-foreground">{t("docPatient.allergies")}</p>
                   <p className="font-medium">{Array.isArray((patient as any)?.allergies) && (patient as any).allergies.length ? (patient as any).allergies.join(", ") : "—"}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Gender</p>
+                  <p className="text-muted-foreground">{t("docPatient.gender")}</p>
                   <p className="font-medium">{(patient as any)?.gender || "—"}</p>
                 </div>
               </div>
 
               <div className="mt-4">
-                <p className="text-muted-foreground text-sm">Medical History</p>
+                <p className="text-muted-foreground text-sm">{t("docPatient.medicalHistory")}</p>
                 <ul className="list-disc list-inside text-sm mt-1">
                   {Array.isArray((patient as any)?.medicalHistory) && (patient as any).medicalHistory.length ? (
                     (patient as any).medicalHistory.map((m: string, i: number) => <li key={i}>{m}</li>)
@@ -426,7 +427,7 @@ export default function PatientDetailPage() {
             <Card className="mb-6 border-primary/50">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Add Medical Record</CardTitle>
+                  <CardTitle>{t("mr.formTitle")}</CardTitle>
                   <Button
                     type="button"
                     variant="outline"
@@ -435,7 +436,7 @@ export default function PatientDetailPage() {
                     className="gap-2"
                   >
                     <Brain className="w-4 h-4" />
-                    {showVoiceRecorder ? "Hide" : "Voice Notes"}
+                    {showVoiceRecorder ? t("common.hide") : t("docPatient.voiceNotes")}
                   </Button>
                 </div>
               </CardHeader>
@@ -447,9 +448,9 @@ export default function PatientDetailPage() {
                 )}
                 <form onSubmit={handleAddRecord} className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Diagnosis</label>
+                    <label className="text-sm font-medium">{t("mr.diagnosis")}</label>
                     <Input
-                      placeholder="e.g., Type 2 Diabetes"
+                      placeholder={t("docPatient.diagnosisPh")}
                       value={diagnosis}
                       onChange={(e) => setDiagnosis(e.target.value)}
                       required
@@ -458,7 +459,7 @@ export default function PatientDetailPage() {
 
                   {doctors.length > 0 && (
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Assign Doctor</label>
+                      <label className="text-sm font-medium">{t("docPatient.assignDoctor")}</label>
                       <select
                         value={selectedDoctorId}
                         onChange={(e) => setSelectedDoctorId(e.target.value)}
@@ -474,19 +475,19 @@ export default function PatientDetailPage() {
                   )}
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Symptoms (comma-separated)</label>
+                    <label className="text-sm font-medium">{t("mr.symptomsLabel")}</label>
                     <Input
-                      placeholder="e.g., Increased thirst, Fatigue"
+                      placeholder={t("docPatient.symptomsPh")}
                       value={symptoms}
                       onChange={(e) => setSymptoms(e.target.value)}
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Clinical Notes</label>
+                    <label className="text-sm font-medium">{t("docPatient.clinicalNotes")}</label>
                     <textarea
                       className="w-full min-h-24 px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                      placeholder="Detailed clinical observations"
+                      placeholder={t("docPatient.clinicalNotesPh")}
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                     />
@@ -494,10 +495,10 @@ export default function PatientDetailPage() {
 
                   <div className="flex gap-2">
                     <Button type="submit" disabled={loading || doctors.length === 0}>
-                      {loading ? "Saving..." : "Save Record"}
+                      {loading ? t("mr.saving") : t("mr.saveRecord")}
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setShowRecordForm(false)}>
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                   </div>
                 </form>
@@ -510,7 +511,7 @@ export default function PatientDetailPage() {
             <Card className="mb-6 border-primary/50">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Create Prescription</CardTitle>
+                  <CardTitle>{t("docPatient.rxCreateTitle")}</CardTitle>
                   <Button
                     type="button"
                     variant="outline"
@@ -520,7 +521,7 @@ export default function PatientDetailPage() {
                     className="gap-2"
                   >
                     <Brain className="w-4 h-4" />
-                    {checkingInteractions ? "Checking..." : "Check Interactions"}
+                    {checkingInteractions ? t("docPatient.checkingInteractions") : t("docPatient.checkInteractions")}
                   </Button>
                 </div>
               </CardHeader>
@@ -532,7 +533,9 @@ export default function PatientDetailPage() {
                       <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
                       <div className="flex-1">
                         <h4 className="font-semibold text-destructive mb-2">
-                          Drug Interactions Detected ({drugInteractions.interactions.length})
+                          {t("docPatient.interactionsHeading", undefined, {
+                            count: String(drugInteractions.interactions.length),
+                          })}
                         </h4>
                         <div className="space-y-3">
                           {drugInteractions.interactions.map((interaction: any, idx: number) => (
@@ -569,9 +572,9 @@ export default function PatientDetailPage() {
                       <div key={idx} className="border border-border rounded-lg p-4 space-y-3">
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-2 col-span-2">
-                            <label className="text-sm font-medium">Medication Name</label>
+                            <label className="text-sm font-medium">{t("docPatient.medName")}</label>
                             <Input
-                              placeholder="e.g., Metformin"
+                              placeholder={t("docPatient.medNamePh")}
                               value={med.name}
                               onChange={(e) => {
                                 const newMeds = [...medications]
@@ -581,9 +584,9 @@ export default function PatientDetailPage() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <label className="text-sm font-medium">Dosage</label>
+                            <label className="text-sm font-medium">{t("docPatient.dosage")}</label>
                             <Input
-                              placeholder="e.g., 500mg"
+                              placeholder={t("docPatient.dosagePh")}
                               value={med.dosage}
                               onChange={(e) => {
                                 const newMeds = [...medications]
@@ -593,9 +596,9 @@ export default function PatientDetailPage() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <label className="text-sm font-medium">Frequency</label>
+                            <label className="text-sm font-medium">{t("docPatient.frequency")}</label>
                             <Input
-                              placeholder="e.g., Twice daily"
+                              placeholder={t("docPatient.frequencyPh")}
                               value={med.frequency}
                               onChange={(e) => {
                                 const newMeds = [...medications]
@@ -605,9 +608,9 @@ export default function PatientDetailPage() {
                             />
                           </div>
                           <div className="space-y-2 col-span-2">
-                            <label className="text-sm font-medium">Duration</label>
+                            <label className="text-sm font-medium">{t("docPatient.duration")}</label>
                             <Input
-                              placeholder="e.g., 30 days"
+                              placeholder={t("docPatient.durationPh")}
                               value={med.duration}
                               onChange={(e) => {
                                 const newMeds = [...medications]
@@ -630,14 +633,14 @@ export default function PatientDetailPage() {
                     }
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Medication
+                    {t("docPatient.addMedication")}
                   </Button>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Notes</label>
+                    <label className="text-sm font-medium">{t("mr.notes")}</label>
                     <textarea
                       className="w-full min-h-20 px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                      placeholder="Additional instructions"
+                      placeholder={t("docPatient.rxNotesPh")}
                       value={rxNotes}
                       onChange={(e) => setRxNotes(e.target.value)}
                     />
@@ -645,10 +648,10 @@ export default function PatientDetailPage() {
 
                   <div className="flex gap-2">
                     <Button type="submit" disabled={loading || !medications.some((m) => m.name)}>
-                      {loading ? "Creating..." : "Create Prescription"}
+                      {loading ? t("docPatient.creating") : t("docPatient.createRx")}
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setShowPrescriptionForm(false)}>
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                   </div>
                 </form>
@@ -661,7 +664,7 @@ export default function PatientDetailPage() {
             <div className="flex gap-3 mb-8">
               <Button onClick={() => setShowRecordForm(true)} className="gap-2">
                 <FileText className="w-4 h-4" />
-                Add Record
+                {t("mr.addRecord")}
               </Button>
               <Button
                 onClick={() => setShowPrescriptionForm(true)}
@@ -670,7 +673,7 @@ export default function PatientDetailPage() {
                 disabled={records.length === 0}
               >
                 <Pill className="w-4 h-4" />
-                Create Prescription
+                {t("docPatient.createRx")}
               </Button>
             </div>
           )}
@@ -680,21 +683,23 @@ export default function PatientDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5" />
-                Medical Records
+                {t("common.medicalRecords")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {records.length === 0 ? (
-                <p className="text-muted-foreground">No medical records yet</p>
+                <p className="text-muted-foreground">{t("docPatient.noRecordsYet")}</p>
               ) : (
                 <div className="space-y-4">
                   {records.map((record) => (
                     <div key={record.id} className="border border-border rounded-lg p-4">
                       <h3 className="font-semibold text-lg">{record.diagnosis}</h3>
-                      <p className="text-sm text-muted-foreground mb-2">{new Date(record.date).toLocaleDateString()}</p>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {new Date(record.date).toLocaleDateString(dateLocale)}
+                      </p>
                       {record.symptoms.length > 0 && (
                         <div className="mb-2">
-                          <p className="text-sm font-medium mb-1">Symptoms:</p>
+                          <p className="text-sm font-medium mb-1">{t("mr.symptomsHeading")}</p>
                           <div className="flex flex-wrap gap-2">
                             {record.symptoms.map((symptom, idx) => (
                               <span key={idx} className="bg-muted px-2 py-1 rounded text-xs">
@@ -717,12 +722,12 @@ export default function PatientDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Pill className="w-5 h-5" />
-                Prescriptions
+                {t("rx.title")}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {prescriptions.length === 0 ? (
-                <p className="text-muted-foreground">No prescriptions yet</p>
+                <p className="text-muted-foreground">{t("docPatient.noRxYet")}</p>
               ) : (
                 <div className="space-y-4">
                   {prescriptions.map((rx) => (
@@ -731,9 +736,9 @@ export default function PatientDetailPage() {
                         <div>
                           <h3 className="font-semibold text-lg">{rx.medications.map((m) => m.name).join(", ")}</h3>
                           <p className="text-sm text-muted-foreground">
-                            Issued {new Date(rx.issuedDate).toLocaleDateString()} • Expires {new Date(
-                              rx.expiryDate,
-                            ).toLocaleDateString()}
+                            {t("rx.issued")}{" "}
+                            {new Date(rx.issuedDate).toLocaleDateString(dateLocale)} • {t("rx.expires")}{" "}
+                            {new Date(rx.expiryDate).toLocaleDateString(dateLocale)}
                           </p>
                         </div>
                       </div>
@@ -746,7 +751,11 @@ export default function PatientDetailPage() {
                             </span>
                           </div>
                         ))}
-                        {rx.notes && <p className="text-muted-foreground">Notes: {rx.notes}</p>}
+                        {rx.notes && (
+                          <p className="text-muted-foreground">
+                            {t("docPatient.rxNotesPrefix")} {rx.notes}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}
