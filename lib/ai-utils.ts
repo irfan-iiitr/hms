@@ -549,6 +549,23 @@ function generateClinicalSuggestionsFallback(fallbackContext?: {
     ? patientContext.medicalFilesInformation.slice(0, 3)
     : []
 
+  const recentRecordSummaries = recentRecords.map((record: any) => {
+    const date = record?.date ? new Date(record.date).toLocaleDateString() : "Unknown date"
+    const diagnosisLabel = record?.diagnosis || "No diagnosis recorded"
+    const symptomLabel = Array.isArray(record?.symptoms) && record.symptoms.length
+      ? record.symptoms.join(", ")
+      : "No symptoms recorded"
+    return `${date}: ${diagnosisLabel} (${symptomLabel})`
+  })
+
+  const uploadedFileSummaries = medicalFiles.map((file: any) => {
+    const fileDate = file?.uploadedAt || file?.uploadDate
+    const readableDate = fileDate ? new Date(fileDate).toLocaleDateString() : "Unknown date"
+    const fileName = file?.originalFileName || "Uploaded medical file"
+    const summary = file?.summary || file?.aiSummary || "No summary available"
+    return `${readableDate}: ${fileName} - ${summary}`
+  })
+
   const historyImpact = history.length || recentRecords.length || medicalFiles.length
     ? "Past history and uploaded records should be reviewed closely because they may change the likely diagnosis, medication choice, and follow-up plan for the current visit."
     : "There is limited past history available, so clinical correlation and direct examination remain especially important."
@@ -558,34 +575,77 @@ function generateClinicalSuggestionsFallback(fallbackContext?: {
     .map((med: any) => med?.name)
     .filter(Boolean)
 
-  return [
-    `## Initial Assessment`,
-    `- **Working problem:** ${diagnosis}`,
-    `- **Current symptoms:** ${symptoms.length ? symptoms.join(", ") : "Not clearly documented"}`,
-    `- **History impact:** ${historyImpact}`,
-    allergies.length ? `- **Allergy caution:** Avoid or verify therapies related to ${allergies.join(", ")}.` : `- **Allergy caution:** No allergy list was recorded in the available chart.`,
-    "",
-    `## Likely Causes And Differentials`,
-    `1. Confirm whether the current presentation is a new episode or an extension of prior documented problems.`,
-    `2. Reconcile the present complaint against the patient's known history${history.length ? ` (${history.join(", ")})` : ""}.`,
-    `3. If symptoms differ from previous visits, consider an alternate diagnosis, medication side effect, or complication of chronic disease.`,
-    "",
-    `## Treatment Approach`,
-    `1. Match treatment to severity, current vitals, and physical examination findings before prescribing.`,
-    medicationHistory.length
-      ? `2. Review the recent medication list (${medicationHistory.join(", ")}) for duplication, interaction risk, or recent treatment failure.`
-      : `2. Review current medicines and confirm adherence before adding a new therapy.`,
-    `3. Use the most recent uploaded reports and medical records to tailor testing, medication choice, and follow-up.`,
-    "",
-    `## Monitoring And Follow-Up`,
-    `- Reassess symptom progression, treatment tolerance, and objective response within an appropriate interval for the condition.`,
-    `- Escalate care sooner if red flags, medication intolerance, or unexpected clinical deterioration appear.`,
-    notes ? `- **Current visit notes to incorporate:** ${notes}` : `- Add focused clinical notes and exam findings to improve the next iteration of AI guidance.`,
-    "",
-    `## Red Flags`,
-    `- Worsening pain, breathing difficulty, altered mental status, hemodynamic instability, or inability to tolerate oral intake.`,
-    `- Any severe allergic features, medication reaction, or findings that conflict with prior history or uploaded file summaries.`,
-  ].join("\n")
+  return JSON.stringify(
+    {
+      overview: {
+        title: "Overview",
+        summary: `Structured initial guidance for ${diagnosis}.`,
+        items: [
+          `Working problem: ${diagnosis}`,
+          `Current symptoms: ${symptoms.length ? symptoms.join(", ") : "Not clearly documented"}`,
+          allergies.length ? `Allergy caution: ${allergies.join(", ")}` : "Allergy list not clearly documented",
+        ],
+      },
+      previous_records_and_uploaded_context: {
+        title: "Previous Records And Uploaded Context",
+        summary: "Relevant previous records and uploaded file summaries that should be checked alongside the current visit.",
+        items: [
+          recentRecordSummaries.length ? `Recent medical records: ${recentRecordSummaries.join(" | ")}` : "No previous medical records were available to summarize",
+          uploadedFileSummaries.length ? `Uploaded medical files: ${uploadedFileSummaries.join(" | ")}` : "No uploaded medical file summaries were available",
+          medicationHistory.length ? `Recent prescription context: ${medicationHistory.join(", ")}` : "Recent prescription history is limited",
+        ],
+      },
+      history_informed_considerations: {
+        title: "History-Informed Considerations",
+        summary: historyImpact,
+        items: [
+          history.length ? `Known medical history: ${history.join(", ")}` : "Past medical history is limited in the chart",
+          medicalFiles.length ? "Uploaded medical file summaries should be reviewed before finalizing treatment" : "No uploaded file summaries are available",
+          recentRecords.length ? "Compare the current presentation with recent diagnoses and symptom patterns" : "Recent visit history is limited",
+        ],
+      },
+      differentials: {
+        title: "Likely Causes And Differentials",
+        summary: "Use prior history and the current presentation together before narrowing the diagnosis.",
+        items: [
+          "Confirm whether this is a new episode or continuation of a prior condition",
+          `Reconcile the complaint against known history${history.length ? ` (${history.join(", ")})` : ""}`,
+          "Consider medication side effect, chronic disease complication, or an alternate diagnosis if symptoms do not fit prior patterns",
+        ],
+      },
+      treatment_plan: {
+        title: "Treatment Plan",
+        summary: "Tailor therapy to severity, exam findings, prior response, and safety risks.",
+        items: [
+          "Match treatment intensity to current severity and clinical examination",
+          medicationHistory.length
+            ? `Review recent medication history: ${medicationHistory.join(", ")}`
+            : "Review current medications and adherence before adding new therapy",
+          "Use uploaded reports and recent records to refine drug choice, dosing, and follow-up",
+        ],
+      },
+      investigations_and_monitoring: {
+        title: "Investigations And Monitoring",
+        summary: "Decide on follow-up testing and reassessment based on response and risk.",
+        items: [
+          "Reassess symptoms, tolerance, and objective response within an appropriate interval",
+          "Escalate sooner if symptoms worsen or the response is not as expected",
+          notes ? `Current visit notes to incorporate: ${notes}` : "Add focused exam findings and visit notes to improve the next iteration",
+        ],
+      },
+      red_flags_and_contraindications: {
+        title: "Red Flags And Contraindications",
+        summary: "Review urgent warning signs and treatment-limiting risks before finalizing the plan.",
+        items: [
+          "Worsening pain, breathing difficulty, altered mental status, hemodynamic instability, or inability to tolerate oral intake",
+          "Severe allergic features, medication reaction, or findings that conflict with past history or uploaded reports",
+          allergies.length ? `Avoid or verify drugs related to recorded allergies: ${allergies.join(", ")}` : "Confirm allergy history before prescribing high-risk medications",
+        ],
+      },
+    },
+    null,
+    2
+  )
 }
 
 // Generate a plain-language summary for patients with strong guardrails.

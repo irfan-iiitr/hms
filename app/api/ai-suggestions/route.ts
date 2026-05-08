@@ -8,11 +8,95 @@ export const runtime = "nodejs"
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string }
 
+type StructuredSuggestionSection = {
+  title: string
+  summary: string
+  items: string[]
+}
+
+type StructuredSuggestions = {
+  overview: StructuredSuggestionSection
+  previous_records_and_uploaded_context: StructuredSuggestionSection
+  history_informed_considerations: StructuredSuggestionSection
+  differentials: StructuredSuggestionSection
+  treatment_plan: StructuredSuggestionSection
+  investigations_and_monitoring: StructuredSuggestionSection
+  red_flags_and_contraindications: StructuredSuggestionSection
+}
+
 function pick<T extends object>(obj: T | null | undefined, keys: (keyof T)[]) {
   const out: Partial<T> = {}
   if (!obj) return out
   for (const k of keys) (out as any)[k] = (obj as any)[k]
   return out
+}
+
+function normalizeSection(value: any, fallbackTitle: string): StructuredSuggestionSection {
+  const items = Array.isArray(value?.items)
+    ? value.items.map((item: any) => String(item).trim()).filter(Boolean)
+    : []
+
+  return {
+    title: String(value?.title || fallbackTitle),
+    summary: String(value?.summary || "").trim(),
+    items,
+  }
+}
+
+function parseStructuredSuggestions(text: string): StructuredSuggestions | null {
+  const trimmed = String(text || "").trim()
+  if (!trimmed) return null
+
+  let parsed: any = null
+  try {
+    parsed = JSON.parse(trimmed)
+  } catch {
+    const first = trimmed.indexOf("{")
+    const last = trimmed.lastIndexOf("}")
+    if (first !== -1 && last !== -1 && last > first) {
+      try {
+        parsed = JSON.parse(trimmed.slice(first, last + 1))
+      } catch {
+        parsed = null
+      }
+    }
+  }
+
+  if (!parsed || typeof parsed !== "object") return null
+
+  return {
+    overview: normalizeSection(parsed.overview, "Overview"),
+    previous_records_and_uploaded_context: normalizeSection(parsed.previous_records_and_uploaded_context, "Previous Records And Uploaded Context"),
+    history_informed_considerations: normalizeSection(parsed.history_informed_considerations, "History-Informed Considerations"),
+    differentials: normalizeSection(parsed.differentials, "Likely Causes And Differentials"),
+    treatment_plan: normalizeSection(parsed.treatment_plan, "Treatment Plan"),
+    investigations_and_monitoring: normalizeSection(parsed.investigations_and_monitoring, "Investigations And Monitoring"),
+    red_flags_and_contraindications: normalizeSection(parsed.red_flags_and_contraindications, "Red Flags And Contraindications"),
+  }
+}
+
+function formatStructuredSuggestions(structured: StructuredSuggestions) {
+  const sections = [
+    structured.overview,
+    structured.previous_records_and_uploaded_context,
+    structured.history_informed_considerations,
+    structured.differentials,
+    structured.treatment_plan,
+    structured.investigations_and_monitoring,
+    structured.red_flags_and_contraindications,
+  ]
+
+  return sections
+    .map((section) => {
+      const lines = [`## ${section.title}`]
+      if (section.summary) lines.push(section.summary)
+      if (section.items.length) {
+        lines.push("")
+        lines.push(...section.items.map((item) => `- ${item}`))
+      }
+      return lines.join("\n")
+    })
+    .join("\n\n")
 }
 
 async function buildPatientContext(patientId: string) {
@@ -137,8 +221,11 @@ function composePrompt(context: any, condition: string, diagnosis?: string, symp
 
   lines.push("")
   lines.push("Formatting requirements:")
-  lines.push("- Use markdown headings and bullets")
-  lines.push("- Add a dedicated section named 'History-informed considerations'")
+  lines.push("- Return ONLY valid JSON and no extra prose before or after the JSON")
+  lines.push("- Use exactly these top-level keys: overview, previous_records_and_uploaded_context, history_informed_considerations, differentials, treatment_plan, investigations_and_monitoring, red_flags_and_contraindications")
+  lines.push("- Each key must contain an object with: title (string), summary (string), items (array of short strings)")
+  lines.push("- Keep items concise and section-specific so the UI can render them clearly")
+  lines.push("- The previous_records_and_uploaded_context section must explicitly summarize relevant prior medical records and uploaded file summaries")
   lines.push("- If data is missing, say what is missing instead of inventing details")
 
   return lines.join("\n")
@@ -251,14 +338,17 @@ export async function POST(request: NextRequest) {
     const prompt = composePrompt(context, condition, diagnosis, symptoms, notes)
     console.log("[AI Suggestions] prompt preview:\n" + prompt.substring(0, 400))
 
-    const suggestions = await generateClinicalSuggestions(prompt, {
+    const rawSuggestions = await generateClinicalSuggestions(prompt, {
       diagnosis: diagnosis || condition,
       symptoms: Array.isArray(symptoms) ? symptoms : [],
       notes: notes || "",
       patientContext: context,
     })
 
-    return NextResponse.json({ success: true, suggestions })
+    const structuredSuggestions = parseStructuredSuggestions(rawSuggestions)
+    const suggestions = structuredSuggestions ? formatStructuredSuggestions(structuredSuggestions) : rawSuggestions
+
+    return NextResponse.json({ success: true, suggestions, structuredSuggestions })
   } catch (error) {
     console.error("/api/ai-suggestions error", error)
     return NextResponse.json(

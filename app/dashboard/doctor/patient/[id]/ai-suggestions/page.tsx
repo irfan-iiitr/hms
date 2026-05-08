@@ -41,6 +41,22 @@ const Markdown: any = ReactMarkdown
 
 type ChatMessage = { role: "user" | "assistant"; content: string }
 
+type SuggestionSection = {
+  title: string
+  summary: string
+  items: string[]
+}
+
+type StructuredSuggestions = {
+  overview: SuggestionSection
+  previous_records_and_uploaded_context: SuggestionSection
+  history_informed_considerations: SuggestionSection
+  differentials: SuggestionSection
+  treatment_plan: SuggestionSection
+  investigations_and_monitoring: SuggestionSection
+  red_flags_and_contraindications: SuggestionSection
+}
+
 type PatientContext = {
   _id?: string
   id?: string
@@ -105,6 +121,7 @@ export default function AISuggestionsPage() {
   const [notes, setNotes] = useState("")
 
   const [suggestions, setSuggestions] = useState("")
+  const [structuredSuggestions, setStructuredSuggestions] = useState<StructuredSuggestions | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState("")
   const [copied, setCopied] = useState(false)
@@ -173,6 +190,7 @@ export default function AISuggestionsPage() {
           const firstAssistant = data.item.messages.find((msg: ChatMessage) => msg.role === "assistant")
           if (firstAssistant?.content) {
             setSuggestions(firstAssistant.content)
+            setStructuredSuggestions(null)
           }
         }
       } catch (historyError) {
@@ -265,9 +283,11 @@ export default function AISuggestionsPage() {
       }
 
       const nextSuggestions = data?.suggestions || ""
+      const nextStructuredSuggestions = data?.structuredSuggestions || null
       const seededMessages: ChatMessage[] = [{ role: "assistant", content: nextSuggestions }]
 
       setSuggestions(nextSuggestions)
+      setStructuredSuggestions(nextStructuredSuggestions)
       setMessages(seededMessages)
       await persistChat(seededMessages)
 
@@ -323,6 +343,18 @@ export default function AISuggestionsPage() {
     "What contraindications should I watch for before prescribing?",
     "Which follow-up tests or monitoring steps matter most now?",
   ]
+
+  const suggestionSections = structuredSuggestions
+    ? [
+        structuredSuggestions.overview,
+        structuredSuggestions.previous_records_and_uploaded_context,
+        structuredSuggestions.history_informed_considerations,
+        structuredSuggestions.differentials,
+        structuredSuggestions.treatment_plan,
+        structuredSuggestions.investigations_and_monitoring,
+        structuredSuggestions.red_flags_and_contraindications,
+      ]
+    : []
 
   return (
     <ProtectedRoute>
@@ -576,11 +608,19 @@ export default function AISuggestionsPage() {
                     </div>
                   ) : suggestions ? (
                     <div className="space-y-4">
-                      <div className="rounded-2xl border bg-background p-5">
-                        <div className="prose max-w-none text-sm dark:prose-invert">
-                          <Markdown remarkPlugins={[remarkGfm as any]}>{suggestions}</Markdown>
+                      {suggestionSections.length ? (
+                        <div className="grid gap-4">
+                          {suggestionSections.map((section, index) => (
+                            <SuggestionSectionCard key={`${section.title}-${index}`} section={section} />
+                          ))}
                         </div>
-                      </div>
+                      ) : (
+                        <div className="rounded-2xl border bg-background p-5">
+                          <div className="prose max-w-none text-sm dark:prose-invert">
+                            <Markdown remarkPlugins={[remarkGfm as any]}>{suggestions}</Markdown>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="grid gap-3 md:grid-cols-2">
                         <Button className="w-full gap-2" onClick={handleUseSuggestions}>
@@ -791,6 +831,28 @@ function SectionBlock({
       ) : (
         <p className="text-sm text-muted-foreground">{empty}</p>
       )}
+    </div>
+  )
+}
+
+function SuggestionSectionCard({ section }: { section: SuggestionSection }) {
+  return (
+    <div className="rounded-2xl border bg-background p-5 shadow-sm">
+      <div className="mb-3">
+        <h3 className="text-base font-semibold">{section.title}</h3>
+        {section.summary ? <p className="mt-1 text-sm leading-6 text-muted-foreground">{section.summary}</p> : null}
+      </div>
+
+      {section.items.length ? (
+        <div className="space-y-2">
+          {section.items.map((item, index) => (
+            <div key={`${item}-${index}`} className="flex gap-3 rounded-xl bg-muted/30 px-3 py-2 text-sm">
+              <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+              <p className="leading-6">{item}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
