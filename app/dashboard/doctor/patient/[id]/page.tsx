@@ -22,13 +22,14 @@ import { MedicalFilesInfoBox } from "@/components/dashboards/medical-files-info-
 import { VoiceRecorder } from "@/components/voice-recorder"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { FullPageLoader } from "@/components/ui/full-page-loader"
 import { useI18n } from "@/lib/i18n"
 
 export default function PatientDetailPage() {
   const { user } = useAuth()
   const params = useParams()
+  const searchParams = useSearchParams()
   const patientId = params.id as string
   const { toast } = useToast()
   const { t, language } = useI18n()
@@ -57,6 +58,46 @@ export default function PatientDetailPage() {
   const [error, setError] = useState("")
   const [isLoadingPatient, setIsLoadingPatient] = useState(true)
   const [patientNotFound, setPatientNotFound] = useState(false)
+  const handoffStorageKey = `ai-suggestions-draft:${patientId}`
+
+  useEffect(() => {
+    const shouldOpenRecordForm = searchParams.get("openRecordForm") === "1"
+    const prefillFromAi = searchParams.get("prefillFromAi") === "1"
+    let prefillDiagnosis = searchParams.get("prefillDiagnosis") || ""
+    let prefillSymptoms = searchParams.get("prefillSymptoms") || ""
+    let prefillNotes = searchParams.get("prefillNotes") || ""
+    let aiPlan = searchParams.get("aiPlan") || ""
+
+    if (prefillFromAi && typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem(handoffStorageKey)
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          prefillDiagnosis = prefillDiagnosis || parsed?.diagnosis || ""
+          prefillSymptoms = prefillSymptoms || parsed?.symptoms || ""
+          prefillNotes = prefillNotes || parsed?.notes || ""
+          aiPlan = aiPlan || parsed?.aiPlan || ""
+          sessionStorage.removeItem(handoffStorageKey)
+        }
+      } catch (storageError) {
+        console.warn("Failed to load AI handoff draft", storageError)
+      }
+    }
+
+    if (!shouldOpenRecordForm && !prefillDiagnosis && !prefillSymptoms && !prefillNotes && !aiPlan) {
+      return
+    }
+
+    setShowRecordForm(shouldOpenRecordForm || Boolean(prefillDiagnosis || prefillSymptoms || prefillNotes || aiPlan))
+    if (prefillDiagnosis) setDiagnosis(prefillDiagnosis)
+    if (prefillSymptoms) setSymptoms(prefillSymptoms)
+
+    const combinedNotes = [prefillNotes.trim(), aiPlan.trim() ? `AI Plan Suggestions:\n${aiPlan.trim()}` : ""]
+      .filter(Boolean)
+      .join("\n\n")
+
+    if (combinedNotes) setNotes(combinedNotes)
+  }, [handoffStorageKey, searchParams])
 
   useEffect(() => {
     let mounted = true

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server"
 import { ObjectId } from "mongodb"
 
 import { getCollection } from "@/lib/db"
-import { generateAIPrescriptionSuggestions, generateMedicalAnalysis, generateChatResponse } from "@/lib/ai-utils"
+import { generateChatResponse, generateClinicalSuggestions } from "@/lib/ai-utils"
 
 export const runtime = "nodejs"
 
@@ -66,6 +66,9 @@ function composePrompt(context: any, condition: string, diagnosis?: string, symp
   lines.push("You are a clinical decision support assistant."
     + " Provide evidence-informed suggestions, typical dosages, and cautions."
     + " Always include safety notes and advise verification with clinical guidelines.")
+  lines.push("Use the entire patient context, especially allergies, uploaded medical file summaries, past diagnoses, and prior prescriptions.")
+  lines.push("Past history may directly affect the current diagnosis, recommended workup, treatment choice, contraindications, and follow-up.")
+  lines.push("Do not ignore chronic disease history or previously uploaded reports if they could explain or complicate the current presentation.")
   lines.push("")
   lines.push("Patient summary:")
   lines.push(`- Name: ${context?.profile?.name || "(hidden)"}`)
@@ -90,8 +93,29 @@ function composePrompt(context: any, condition: string, diagnosis?: string, symp
     lines.push("")
     lines.push("Recent prescriptions:")
     for (const p of context.recentPrescriptions.slice(0, 5)) {
-      const meds = Array.isArray(p.medications) ? p.medications.map((m: any) => m.name).join(", ") : "(n/a)"
+      const meds = Array.isArray(p.medications)
+        ? p.medications
+            .map((m: any) => [m.name, m.dosage, m.frequency].filter(Boolean).join(" "))
+            .join(", ")
+        : "(n/a)"
       lines.push(`• ${new Date(p.issuedDate).toLocaleDateString()}: ${meds}`)
+      if (p.notes) lines.push(`  notes: ${p.notes}`)
+    }
+  }
+
+  if (Array.isArray(context?.medicalFilesInformation) && context.medicalFilesInformation.length) {
+    lines.push("")
+    lines.push("Uploaded medical files and extracted summaries:")
+    for (const file of context.medicalFilesInformation.slice(0, 5)) {
+      const fileDate = file?.uploadedAt || file?.uploadDate
+      const summary = file?.summary || file?.aiSummary || "No summary available"
+      const keyFindings = Array.isArray(file?.keyFindings) && file.keyFindings.length
+        ? file.keyFindings.join(", ")
+        : ""
+      const fileName = file?.originalFileName || file?.publicId || "Uploaded file"
+      lines.push(`• ${fileName}${fileDate ? ` (${new Date(fileDate).toLocaleDateString()})` : ""}: ${summary}`)
+      if (keyFindings) lines.push(`  key findings: ${keyFindings}`)
+      if (file?.details?.raw_text) lines.push(`  extracted text: ${String(file.details.raw_text).slice(0, 400)}`)
     }
   }
 
@@ -109,6 +133,13 @@ function composePrompt(context: any, condition: string, diagnosis?: string, symp
   lines.push("3) non-pharmacological advice")
   lines.push("4) monitoring and follow-up")
   lines.push("5) red flags and contraindications")
+  lines.push("6) how past history, allergies, and uploaded files change or refine the current plan")
+
+  lines.push("")
+  lines.push("Formatting requirements:")
+  lines.push("- Use markdown headings and bullets")
+  lines.push("- Add a dedicated section named 'History-informed considerations'")
+  lines.push("- If data is missing, say what is missing instead of inventing details")
 
   return lines.join("\n")
 }
@@ -220,11 +251,12 @@ export async function POST(request: NextRequest) {
     const prompt = composePrompt(context, condition, diagnosis, symptoms, notes)
     console.log("[AI Suggestions] prompt preview:\n" + prompt.substring(0, 400))
 
-    // Use mock generators to simulate LLM response
-    const base = await generateAIPrescriptionSuggestions(diagnosis || condition, Array.isArray(symptoms) ? symptoms : [])
-    const analysis = await generateMedicalAnalysis(diagnosis || condition, Array.isArray(symptoms) ? symptoms : [], notes || "")
-
-    const suggestions = `${base}\n\n---\n\nContext-aware considerations based on patient data:\n\n${analysis}`
+    const suggestions = await generateClinicalSuggestions(prompt, {
+      diagnosis: diagnosis || condition,
+      symptoms: Array.isArray(symptoms) ? symptoms : [],
+      notes: notes || "",
+      patientContext: context,
+    })
 
     return NextResponse.json({ success: true, suggestions })
   } catch (error) {

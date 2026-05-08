@@ -1,4 +1,6 @@
 
+import { generateChatWithConfiguredProvider, generateTextWithConfiguredProvider, getAIConfig } from "@/lib/ai-provider"
+
 // Send a medical file to Gemini (or a configured AI endpoint) and extract information.
 // IMPORTANT: Do NOT hardcode API keys in source. Set the following environment variables in your
 // server environment (e.g. in .env.local) and restart the Next.js server:
@@ -240,6 +242,40 @@ Medical Record Analysis:
   return analysis
 }
 
+export async function generateClinicalSuggestions(
+  prompt: string,
+  fallbackContext?: {
+    diagnosis?: string
+    symptoms?: string[]
+    notes?: string
+    patientContext?: any
+  }
+): Promise<string> {
+  const { apiKey, provider } = getAIConfig()
+
+  if (!apiKey) {
+    console.warn("[AI Suggestions] No AI provider key configured, using fallback response")
+    return generateClinicalSuggestionsFallback(fallbackContext)
+  }
+
+  try {
+    const text = await generateTextWithConfiguredProvider(prompt, {
+      temperature: 0.35,
+      maxOutputTokens: 1800,
+    })
+
+    if (!text?.trim()) {
+      console.warn(`[AI Suggestions] Empty ${provider} response, using fallback response`)
+      return generateClinicalSuggestionsFallback(fallbackContext)
+    }
+
+    return text.trim()
+  } catch (error) {
+    console.error(`[AI Suggestions] Error calling ${provider} API:`, error)
+    return generateClinicalSuggestionsFallback(fallbackContext)
+  }
+}
+
 // Generate conversational chat response using Gemini AI
 export async function generateChatResponse(
   userQuestion: string,
@@ -253,80 +289,32 @@ export async function generateChatResponse(
   },
   conversationHistory?: Array<{ role: string; content: string }>
 ): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GENERATIVE_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
-  const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.5-flash-preview-09-2025"
+  const { apiKey, provider } = getAIConfig()
 
   // Fallback to mock response if no API key
   if (!apiKey) {
-    console.warn("[AI Chat] No Gemini API key configured, using mock response")
+    console.warn("[AI Chat] No AI provider key configured, using mock response")
     return generateMockChatResponse(userQuestion, patientContext)
   }
 
   try {
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`
-
     // Build context-aware system prompt
     const systemPrompt = buildChatSystemPrompt(patientContext)
-    
-    // Build conversation messages
-    const contents: any[] = []
-    
-    // Add system context
-    contents.push({
-      parts: [{ text: systemPrompt }]
-    })
-    
-    // Add conversation history if available
-    if (conversationHistory && conversationHistory.length > 0) {
-      // Take last 5 exchanges to avoid token limits
-      const recentHistory = conversationHistory.slice(-10)
-      recentHistory.forEach(msg => {
-        if (msg.role === "user" || msg.role === "assistant") {
-          contents.push({
-            parts: [{ text: msg.content }]
-          })
-        }
-      })
-    }
-    
-    // Add current question
-    contents.push({
-      parts: [{ text: userQuestion }]
-    })
-
-    const payload = {
-      contents,
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 1024,
-      }
-    }
-
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "")
-      console.error("[AI Chat] Gemini API error:", response.status, errorText)
-      throw new Error(`Gemini API error: ${response.status}`)
-    }
-
-    const data = await response.json()
-    const text = data?.candidates?.[0]?.content?.parts?.find((p: any) => p?.text)?.text || ""
+    const text = await generateChatWithConfiguredProvider(
+      systemPrompt,
+      conversationHistory || [],
+      userQuestion,
+      { temperature: 0.7, maxOutputTokens: 1024 }
+    )
 
     if (!text) {
-      console.warn("[AI Chat] No text in Gemini response, using fallback")
+      console.warn(`[AI Chat] No text in ${provider} response, using fallback`)
       return generateMockChatResponse(userQuestion, patientContext)
     }
 
     return text.trim()
   } catch (error) {
-    console.error("[AI Chat] Error calling Gemini API:", error)
+    console.error(`[AI Chat] Error calling ${provider} API:`, error)
     return generateMockChatResponse(userQuestion, patientContext)
   }
 }
@@ -538,6 +526,66 @@ function generateMockChatResponse(userQuestion: string, patientContext: any): st
   
   // Generic response
   return `Based on ${patientContext.name ? patientContext.name + "'s" : "the patient's"} profile:\n\n- **Name:** ${patientContext.name || "Not specified"}\n- **Age:** ${patientContext.age || "Adult"} year old ${patientContext.gender || "patient"}\n- **Current diagnosis:** ${patientContext.recentDiagnosis || "Not specified"}\n- **Medications:** ${patientContext.currentMedications?.join(", ") || "None listed"}\n\nFor your specific question about "${userQuestion}", I recommend:\n\n1. Review current treatment plan for ${patientContext.name || "this patient"}\n2. Consider patient-specific factors (age, comorbidities)\n3. Monitor for any adverse effects\n4. Ensure patient understanding and compliance\n\n${patientContext.allergies?.length > 0 ? `⚠️ Remember: ${patientContext.name || "Patient"} is allergic to ${patientContext.allergies.join(", ")}` : ""}`
+}
+
+function generateClinicalSuggestionsFallback(fallbackContext?: {
+  diagnosis?: string
+  symptoms?: string[]
+  notes?: string
+  patientContext?: any
+}) {
+  const diagnosis = fallbackContext?.diagnosis || "Current presentation"
+  const symptoms = fallbackContext?.symptoms?.filter(Boolean) || []
+  const notes = fallbackContext?.notes || ""
+  const patientContext = fallbackContext?.patientContext || {}
+  const profile = patientContext?.profile || {}
+  const allergies = Array.isArray(profile?.allergies) ? profile.allergies : []
+  const history = Array.isArray(profile?.medicalHistory) ? profile.medicalHistory : []
+  const recentRecords = Array.isArray(patientContext?.recentRecords) ? patientContext.recentRecords.slice(0, 3) : []
+  const recentPrescriptions = Array.isArray(patientContext?.recentPrescriptions)
+    ? patientContext.recentPrescriptions.slice(0, 3)
+    : []
+  const medicalFiles = Array.isArray(patientContext?.medicalFilesInformation)
+    ? patientContext.medicalFilesInformation.slice(0, 3)
+    : []
+
+  const historyImpact = history.length || recentRecords.length || medicalFiles.length
+    ? "Past history and uploaded records should be reviewed closely because they may change the likely diagnosis, medication choice, and follow-up plan for the current visit."
+    : "There is limited past history available, so clinical correlation and direct examination remain especially important."
+
+  const medicationHistory = recentPrescriptions
+    .flatMap((rx: any) => Array.isArray(rx?.medications) ? rx.medications : [])
+    .map((med: any) => med?.name)
+    .filter(Boolean)
+
+  return [
+    `## Initial Assessment`,
+    `- **Working problem:** ${diagnosis}`,
+    `- **Current symptoms:** ${symptoms.length ? symptoms.join(", ") : "Not clearly documented"}`,
+    `- **History impact:** ${historyImpact}`,
+    allergies.length ? `- **Allergy caution:** Avoid or verify therapies related to ${allergies.join(", ")}.` : `- **Allergy caution:** No allergy list was recorded in the available chart.`,
+    "",
+    `## Likely Causes And Differentials`,
+    `1. Confirm whether the current presentation is a new episode or an extension of prior documented problems.`,
+    `2. Reconcile the present complaint against the patient's known history${history.length ? ` (${history.join(", ")})` : ""}.`,
+    `3. If symptoms differ from previous visits, consider an alternate diagnosis, medication side effect, or complication of chronic disease.`,
+    "",
+    `## Treatment Approach`,
+    `1. Match treatment to severity, current vitals, and physical examination findings before prescribing.`,
+    medicationHistory.length
+      ? `2. Review the recent medication list (${medicationHistory.join(", ")}) for duplication, interaction risk, or recent treatment failure.`
+      : `2. Review current medicines and confirm adherence before adding a new therapy.`,
+    `3. Use the most recent uploaded reports and medical records to tailor testing, medication choice, and follow-up.`,
+    "",
+    `## Monitoring And Follow-Up`,
+    `- Reassess symptom progression, treatment tolerance, and objective response within an appropriate interval for the condition.`,
+    `- Escalate care sooner if red flags, medication intolerance, or unexpected clinical deterioration appear.`,
+    notes ? `- **Current visit notes to incorporate:** ${notes}` : `- Add focused clinical notes and exam findings to improve the next iteration of AI guidance.`,
+    "",
+    `## Red Flags`,
+    `- Worsening pain, breathing difficulty, altered mental status, hemodynamic instability, or inability to tolerate oral intake.`,
+    `- Any severe allergic features, medication reaction, or findings that conflict with prior history or uploaded file summaries.`,
+  ].join("\n")
 }
 
 // Generate a plain-language summary for patients with strong guardrails.
