@@ -2,17 +2,101 @@ import { NextResponse, type NextRequest } from "next/server"
 import { ObjectId } from "mongodb"
 
 import { getCollection } from "@/lib/db"
-import { generateAIPrescriptionSuggestions, generateMedicalAnalysis, generateChatResponse } from "@/lib/ai-utils"
+import { generateChatResponse, generateClinicalSuggestions } from "@/lib/ai-utils"
 
 export const runtime = "nodejs"
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string }
+
+type StructuredSuggestionSection = {
+  title: string
+  summary: string
+  items: string[]
+}
+
+type StructuredSuggestions = {
+  overview: StructuredSuggestionSection
+  previous_records_and_uploaded_context: StructuredSuggestionSection
+  history_informed_considerations: StructuredSuggestionSection
+  differentials: StructuredSuggestionSection
+  treatment_plan: StructuredSuggestionSection
+  investigations_and_monitoring: StructuredSuggestionSection
+  red_flags_and_contraindications: StructuredSuggestionSection
+}
 
 function pick<T extends object>(obj: T | null | undefined, keys: (keyof T)[]) {
   const out: Partial<T> = {}
   if (!obj) return out
   for (const k of keys) (out as any)[k] = (obj as any)[k]
   return out
+}
+
+function normalizeSection(value: any, fallbackTitle: string): StructuredSuggestionSection {
+  const items = Array.isArray(value?.items)
+    ? value.items.map((item: any) => String(item).trim()).filter(Boolean)
+    : []
+
+  return {
+    title: String(value?.title || fallbackTitle),
+    summary: String(value?.summary || "").trim(),
+    items,
+  }
+}
+
+function parseStructuredSuggestions(text: string): StructuredSuggestions | null {
+  const trimmed = String(text || "").trim()
+  if (!trimmed) return null
+
+  let parsed: any = null
+  try {
+    parsed = JSON.parse(trimmed)
+  } catch {
+    const first = trimmed.indexOf("{")
+    const last = trimmed.lastIndexOf("}")
+    if (first !== -1 && last !== -1 && last > first) {
+      try {
+        parsed = JSON.parse(trimmed.slice(first, last + 1))
+      } catch {
+        parsed = null
+      }
+    }
+  }
+
+  if (!parsed || typeof parsed !== "object") return null
+
+  return {
+    overview: normalizeSection(parsed.overview, "Overview"),
+    previous_records_and_uploaded_context: normalizeSection(parsed.previous_records_and_uploaded_context, "Previous Records And Uploaded Context"),
+    history_informed_considerations: normalizeSection(parsed.history_informed_considerations, "History-Informed Considerations"),
+    differentials: normalizeSection(parsed.differentials, "Likely Causes And Differentials"),
+    treatment_plan: normalizeSection(parsed.treatment_plan, "Treatment Plan"),
+    investigations_and_monitoring: normalizeSection(parsed.investigations_and_monitoring, "Investigations And Monitoring"),
+    red_flags_and_contraindications: normalizeSection(parsed.red_flags_and_contraindications, "Red Flags And Contraindications"),
+  }
+}
+
+function formatStructuredSuggestions(structured: StructuredSuggestions) {
+  const sections = [
+    structured.overview,
+    structured.previous_records_and_uploaded_context,
+    structured.history_informed_considerations,
+    structured.differentials,
+    structured.treatment_plan,
+    structured.investigations_and_monitoring,
+    structured.red_flags_and_contraindications,
+  ]
+
+  return sections
+    .map((section) => {
+      const lines = [`## ${section.title}`]
+      if (section.summary) lines.push(section.summary)
+      if (section.items.length) {
+        lines.push("")
+        lines.push(...section.items.map((item) => `- ${item}`))
+      }
+      return lines.join("\n")
+    })
+    .join("\n\n")
 }
 
 async function buildPatientContext(patientId: string) {
@@ -66,6 +150,9 @@ function composePrompt(context: any, condition: string, diagnosis?: string, symp
   lines.push("You are a clinical decision support assistant."
     + " Provide evidence-informed suggestions, typical dosages, and cautions."
     + " Always include safety notes and advise verification with clinical guidelines.")
+  lines.push("Use the entire patient context, especially allergies, uploaded medical file summaries, past diagnoses, and prior prescriptions.")
+  lines.push("Past history may directly affect the current diagnosis, recommended workup, treatment choice, contraindications, and follow-up.")
+  lines.push("Do not ignore chronic disease history or previously uploaded reports if they could explain or complicate the current presentation.")
   lines.push("")
   lines.push("Patient summary:")
   lines.push(`- Name: ${context?.profile?.name || "(hidden)"}`)
@@ -90,8 +177,29 @@ function composePrompt(context: any, condition: string, diagnosis?: string, symp
     lines.push("")
     lines.push("Recent prescriptions:")
     for (const p of context.recentPrescriptions.slice(0, 5)) {
-      const meds = Array.isArray(p.medications) ? p.medications.map((m: any) => m.name).join(", ") : "(n/a)"
+      const meds = Array.isArray(p.medications)
+        ? p.medications
+            .map((m: any) => [m.name, m.dosage, m.frequency].filter(Boolean).join(" "))
+            .join(", ")
+        : "(n/a)"
       lines.push(`• ${new Date(p.issuedDate).toLocaleDateString()}: ${meds}`)
+      if (p.notes) lines.push(`  notes: ${p.notes}`)
+    }
+  }
+
+  if (Array.isArray(context?.medicalFilesInformation) && context.medicalFilesInformation.length) {
+    lines.push("")
+    lines.push("Uploaded medical files and extracted summaries:")
+    for (const file of context.medicalFilesInformation.slice(0, 5)) {
+      const fileDate = file?.uploadedAt || file?.uploadDate
+      const summary = file?.summary || file?.aiSummary || "No summary available"
+      const keyFindings = Array.isArray(file?.keyFindings) && file.keyFindings.length
+        ? file.keyFindings.join(", ")
+        : ""
+      const fileName = file?.originalFileName || file?.publicId || "Uploaded file"
+      lines.push(`• ${fileName}${fileDate ? ` (${new Date(fileDate).toLocaleDateString()})` : ""}: ${summary}`)
+      if (keyFindings) lines.push(`  key findings: ${keyFindings}`)
+      if (file?.details?.raw_text) lines.push(`  extracted text: ${String(file.details.raw_text).slice(0, 400)}`)
     }
   }
 
@@ -109,6 +217,16 @@ function composePrompt(context: any, condition: string, diagnosis?: string, symp
   lines.push("3) non-pharmacological advice")
   lines.push("4) monitoring and follow-up")
   lines.push("5) red flags and contraindications")
+  lines.push("6) how past history, allergies, and uploaded files change or refine the current plan")
+
+  lines.push("")
+  lines.push("Formatting requirements:")
+  lines.push("- Return ONLY valid JSON and no extra prose before or after the JSON")
+  lines.push("- Use exactly these top-level keys: overview, previous_records_and_uploaded_context, history_informed_considerations, differentials, treatment_plan, investigations_and_monitoring, red_flags_and_contraindications")
+  lines.push("- Each key must contain an object with: title (string), summary (string), items (array of short strings)")
+  lines.push("- Keep items concise and section-specific so the UI can render them clearly")
+  lines.push("- The previous_records_and_uploaded_context section must explicitly summarize relevant prior medical records and uploaded file summaries")
+  lines.push("- If data is missing, say what is missing instead of inventing details")
 
   return lines.join("\n")
 }
@@ -220,13 +338,17 @@ export async function POST(request: NextRequest) {
     const prompt = composePrompt(context, condition, diagnosis, symptoms, notes)
     console.log("[AI Suggestions] prompt preview:\n" + prompt.substring(0, 400))
 
-    // Use mock generators to simulate LLM response
-    const base = await generateAIPrescriptionSuggestions(diagnosis || condition, Array.isArray(symptoms) ? symptoms : [])
-    const analysis = await generateMedicalAnalysis(diagnosis || condition, Array.isArray(symptoms) ? symptoms : [], notes || "")
+    const rawSuggestions = await generateClinicalSuggestions(prompt, {
+      diagnosis: diagnosis || condition,
+      symptoms: Array.isArray(symptoms) ? symptoms : [],
+      notes: notes || "",
+      patientContext: context,
+    })
 
-    const suggestions = `${base}\n\n---\n\nContext-aware considerations based on patient data:\n\n${analysis}`
+    const structuredSuggestions = parseStructuredSuggestions(rawSuggestions)
+    const suggestions = structuredSuggestions ? formatStructuredSuggestions(structuredSuggestions) : rawSuggestions
 
-    return NextResponse.json({ success: true, suggestions })
+    return NextResponse.json({ success: true, suggestions, structuredSuggestions })
   } catch (error) {
     console.error("/api/ai-suggestions error", error)
     return NextResponse.json(

@@ -1,123 +1,269 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { useAuth } from "@/lib/auth-context"
-import { ProtectedRoute } from "@/components/protected-route"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { useParams, useSearchParams } from "next/navigation"
-import { 
-  ArrowLeft, 
-  Sparkles, 
-  Copy, 
-  Check, 
-  Send, 
-  Bot, 
-  User as UserIcon,
-  FileText,
-  Stethoscope,
-  Pill,
-  FlaskConical,
-  BookOpen,
-  Download,
-  Save,
-  AlertCircle,
-  Loader2
-} from "lucide-react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import Link from "next/link"
+import { useParams, useRouter } from "next/navigation"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-const Markdown: any = ReactMarkdown
-import Link from "next/link"
+import {
+  AlertCircle,
+  ArrowLeft,
+  Bot,
+  Brain,
+  Check,
+  ClipboardPlus,
+  Copy,
+  FileText,
+  Loader2,
+  MessageSquare,
+  Pill,
+  Send,
+  ShieldAlert,
+  Sparkles,
+  Stethoscope,
+  User as UserIcon,
+} from "lucide-react"
+
+import { ProtectedRoute } from "@/components/protected-route"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
+import { fetchMedicalRecordsByPatient, fetchPrescriptionsByPatient } from "@/lib/api"
+import { useAuth } from "@/lib/auth-context"
 import { useI18n } from "@/lib/i18n"
+import { cn } from "@/lib/utils"
+
+const Markdown: any = ReactMarkdown
 
 type ChatMessage = { role: "user" | "assistant"; content: string }
-type ClinicalTool = "diagnosis" | "interactions" | "dosage" | "literature"
+
+type SuggestionSection = {
+  title: string
+  summary: string
+  items: string[]
+}
+
+type StructuredSuggestions = {
+  overview: SuggestionSection
+  previous_records_and_uploaded_context: SuggestionSection
+  history_informed_considerations: SuggestionSection
+  differentials: SuggestionSection
+  treatment_plan: SuggestionSection
+  investigations_and_monitoring: SuggestionSection
+  red_flags_and_contraindications: SuggestionSection
+}
+
+type PatientContext = {
+  _id?: string
+  id?: string
+  name?: string
+  email?: string
+  gender?: string
+  dateOfBirth?: string
+  bloodGroup?: string
+  allergies?: string[]
+  medicalHistory?: string[]
+  medicalFilesInformation?: Array<{
+    summary?: string
+    aiSummary?: string
+    details?: any
+    keyFindings?: string[]
+    uploadedAt?: string
+    uploadDate?: string
+    originalFileName?: string
+    category?: string
+    url?: string
+  }>
+}
+
+function formatDate(value?: string | Date) {
+  if (!value) return "—"
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString()
+}
+
+function calculateAge(dateOfBirth?: string) {
+  if (!dateOfBirth) return null
+  const date = new Date(dateOfBirth)
+  if (Number.isNaN(date.getTime())) return null
+  return Math.floor((Date.now() - date.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+}
+
+function summarizeRecord(record: any) {
+  const symptoms = Array.isArray(record?.symptoms) && record.symptoms.length ? record.symptoms.join(", ") : "No symptoms recorded"
+  return `${record?.diagnosis || "Visit record"} • ${symptoms}`
+}
+
+function summarizePrescription(rx: any) {
+  const medications = Array.isArray(rx?.medications) && rx.medications.length
+    ? rx.medications.map((med: any) => [med?.name, med?.dosage].filter(Boolean).join(" ")).join(", ")
+    : "No medications recorded"
+  return medications
+}
 
 export default function AISuggestionsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const { t } = useI18n()
   const params = useParams()
-  const searchParams = useSearchParams()
+  const router = useRouter()
   const patientId = params.id as string
-
-  // Pre-fill from query if provided (backward compatibility)
-  const presetDiagnosis = searchParams.get("diagnosis") || ""
-  const presetSymptoms = searchParams.get("symptoms")?.split(",")?.filter(Boolean) || []
-
-  // Form state
-  const [diagnosis, setDiagnosis] = useState<string>(presetDiagnosis)
-  const [symptoms, setSymptoms] = useState<string>(presetSymptoms.join(", "))
-  const [condition, setCondition] = useState<string>("")
-  const [notes, setNotes] = useState<string>("")
-
-  // Main results state
-  const [suggestions, setSuggestions] = useState<string>("")
-  const [loading, setLoading] = useState<boolean>(false)
-  const [error, setError] = useState<string>("")
-  const [copied, setCopied] = useState(false)
-  
-  // Chat state
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [chatInput, setChatInput] = useState<string>("")
   const chatEndRef = useRef<HTMLDivElement | null>(null)
-  
-  // Clinical tools state
-  const [activeTab, setActiveTab] = useState<string>("suggestions")
-  const [clinicalToolsData, setClinicalToolsData] = useState<Record<ClinicalTool, any>>({
-    diagnosis: null,
-    interactions: null,
-    dosage: null,
-    literature: null
-  })
-  const [toolLoading, setToolLoading] = useState<ClinicalTool | null>(null)
-  
-  // Patient context
-  const [patientContext, setPatientContext] = useState<any>(null)
+  const handoffStorageKey = `ai-suggestions-draft:${patientId}`
 
-  // Persist & load existing chat history
+  const [diagnosis, setDiagnosis] = useState("")
+  const [symptoms, setSymptoms] = useState("")
+  const [condition, setCondition] = useState("")
+  const [notes, setNotes] = useState("")
+
+  const [suggestions, setSuggestions] = useState("")
+  const [structuredSuggestions, setStructuredSuggestions] = useState<StructuredSuggestions | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState("")
+  const [copied, setCopied] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [chatLoading, setChatLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [patient, setPatient] = useState<PatientContext | null>(null)
+  const [records, setRecords] = useState<any[]>([])
+  const [prescriptions, setPrescriptions] = useState<any[]>([])
+  const [contextLoading, setContextLoading] = useState(true)
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages, chatLoading])
+
   useEffect(() => {
     let ignore = false
-    const loadHistory = async () => {
+
+    const loadContext = async () => {
+      setContextLoading(true)
       try {
-        const res = await fetch(`/api/ai-chats?patientId=${encodeURIComponent(patientId)}&doctorId=${encodeURIComponent(user?.id || (user as any)?._id || "")}`)
-        const data = await res.json()
-        if (!ignore && data?.success && data?.item?.messages) {
-          setMessages(data.item.messages)
-          // If there's an initial assistant message, set it as suggestions to enable chat
-          if (data.item.messages.length > 0 && data.item.messages[0].role === "assistant") {
-            setSuggestions(data.item.messages[0].content)
-          }
+        const [patientRes, recordItems, prescriptionItems] = await Promise.all([
+          fetch(`/api/users/${encodeURIComponent(patientId)}`, { cache: "no-store" }),
+          fetchMedicalRecordsByPatient(patientId),
+          fetchPrescriptionsByPatient(patientId),
+        ])
+
+        const patientData = await patientRes.json().catch(() => null)
+
+        if (ignore) return
+
+        if (patientRes.ok && patientData?.success && patientData?.user) {
+          setPatient(patientData.user)
         }
-      } catch (e) {
-        console.warn("Failed to load chat history", e)
+
+        setRecords(recordItems)
+        setPrescriptions(prescriptionItems)
+
+        if (recordItems[0]) {
+          setDiagnosis((prev) => prev || recordItems[0]?.diagnosis || "")
+          setSymptoms((prev) => prev || (Array.isArray(recordItems[0]?.symptoms) ? recordItems[0].symptoms.join(", ") : ""))
+          setNotes((prev) => prev || recordItems[0]?.notes || "")
+        }
+      } catch (loadError) {
+        console.error("Failed to load AI suggestions context", loadError)
+        if (!ignore) {
+          setError("Failed to load patient context")
+        }
+      } finally {
+        if (!ignore) setContextLoading(false)
       }
     }
-    if (user?.role === "doctor" || user?.role === "admin") loadHistory()
+
+    const loadHistory = async () => {
+      try {
+        const doctorId = user?.id || (user as any)?._id || ""
+        if (!doctorId) return
+
+        const res = await fetch(
+          `/api/ai-chats?patientId=${encodeURIComponent(patientId)}&doctorId=${encodeURIComponent(doctorId)}`,
+          { cache: "no-store" }
+        )
+        const data = await res.json()
+        if (!ignore && data?.success && Array.isArray(data?.item?.messages)) {
+          setMessages(data.item.messages)
+          const firstAssistant = data.item.messages.find((msg: ChatMessage) => msg.role === "assistant")
+          if (firstAssistant?.content) {
+            setSuggestions(firstAssistant.content)
+            setStructuredSuggestions(null)
+          }
+        }
+      } catch (historyError) {
+        console.warn("Failed to load chat history", historyError)
+      }
+    }
+
+    loadContext()
+    if (user?.role === "doctor" || user?.role === "admin") {
+      loadHistory()
+    }
+
     return () => {
       ignore = true
     }
   }, [patientId, user?.id, user?.role])
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
+  const patientAge = useMemo(() => calculateAge(patient?.dateOfBirth), [patient?.dateOfBirth])
+  const allergies = Array.isArray(patient?.allergies) ? patient!.allergies! : []
+  const medicalHistory = Array.isArray(patient?.medicalHistory) ? patient!.medicalHistory! : []
+  const medicalFiles = Array.isArray(patient?.medicalFilesInformation) ? patient!.medicalFilesInformation! : []
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(suggestions)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const persistChat = async (items: ChatMessage[]) => {
+    const doctorId = user?.id || (user as any)?._id || ""
+    if (!doctorId) return
+
+    try {
+      await fetch("/api/ai-chats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patientId, doctorId, messages: items }),
+      })
+    } catch (persistError) {
+      console.warn("Persist chat failed", persistError)
+    }
   }
 
-  async function handleGenerate(e?: React.FormEvent) {
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(suggestions)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (copyError) {
+      console.error("Copy failed", copyError)
+    }
+  }
+
+  const handleUseSuggestions = () => {
+    if (!suggestions.trim()) return
+
+    try {
+      sessionStorage.setItem(
+        handoffStorageKey,
+        JSON.stringify({
+          diagnosis: diagnosis.trim(),
+          symptoms: symptoms.trim(),
+          notes: notes.trim(),
+          aiPlan: suggestions.trim(),
+          createdAt: Date.now(),
+        })
+      )
+    } catch (storageError) {
+      console.warn("Failed to persist AI suggestion draft", storageError)
+    }
+
+    router.push(`/dashboard/doctor/patient/${patientId}?openRecordForm=1&prefillFromAi=1`)
+  }
+
+  const handleGenerate = async (e?: React.FormEvent) => {
     e?.preventDefault()
-    setError("")
     setLoading(true)
+    setError("")
+
     try {
       const res = await fetch("/api/ai-suggestions", {
         method: "POST",
@@ -126,221 +272,513 @@ export default function AISuggestionsPage() {
           patientId,
           condition,
           diagnosis,
-          symptoms: symptoms.split(",").map((s) => s.trim()).filter(Boolean),
+          symptoms: symptoms.split(",").map((value) => value.trim()).filter(Boolean),
           notes,
         }),
       })
+
       const data = await res.json()
-      if (!res.ok || !data?.success) throw new Error(data?.message || "Failed to generate suggestions")
-      setSuggestions(data.suggestions || "")
-      // seed chat with the assistant's initial summary
-      setMessages((prev) => prev.length ? prev : [{ role: "assistant", content: data.suggestions || "" }])
-      // Persist initial suggestions
-      const doctorId = user?.id || (user as any)?._id || ""
-      if (doctorId) {
-        fetch(`/api/ai-chats`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ patientId, doctorId, messages: [{ role: "assistant", content: data.suggestions || "" }] }),
-        }).catch((e) => console.warn("Persist initial chat failed", e))
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.message || "Failed to generate suggestions")
       }
-    } catch (err: any) {
-      console.error("AI suggestions error", err)
-      setError(err?.message || "Failed to generate suggestions")
+
+      const nextSuggestions = data?.suggestions || ""
+      const nextStructuredSuggestions = data?.structuredSuggestions || null
+      const seededMessages: ChatMessage[] = [{ role: "assistant", content: nextSuggestions }]
+
+      setSuggestions(nextSuggestions)
+      setStructuredSuggestions(nextStructuredSuggestions)
+      setMessages(seededMessages)
+      await persistChat(seededMessages)
+
+      toast({
+        title: "Suggestions ready",
+        description: "History-aware guidance has been generated for this patient.",
+      })
+    } catch (generateError: any) {
+      console.error("AI suggestions error", generateError)
+      setError(generateError?.message || "Failed to generate suggestions")
     } finally {
       setLoading(false)
     }
   }
 
-  async function handleSendMessage(e?: React.FormEvent) {
+  const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault()
     const text = chatInput.trim()
-    if (!text) return
-    const newHistory: ChatMessage[] = [...messages, { role: "user", content: text }]
-    setMessages(newHistory)
+    if (!text || !suggestions || chatLoading) return
+
+    const nextHistory: ChatMessage[] = [...messages, { role: "user", content: text }]
+    setMessages(nextHistory)
     setChatInput("")
+    setChatLoading(true)
+    setError("")
+
     try {
       const res = await fetch("/api/ai-suggestions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ patientId, messages: newHistory }),
+        body: JSON.stringify({ patientId, messages: nextHistory }),
       })
+
       const data = await res.json()
-      if (!res.ok || !data?.success || !data?.message) throw new Error(data?.message || "Chat failed")
-      setMessages((prev) => [...prev, data.message as ChatMessage])
-      // Persist chat
-      const doctorId = user?.id || (user as any)?._id || ""
-      if (doctorId) {
-        fetch(`/api/ai-chats`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ patientId, doctorId, messages: [...newHistory, data.message] }),
-        }).catch((e) => console.warn("Persist chat failed", e))
+      if (!res.ok || !data?.success || !data?.message) {
+        throw new Error(data?.message || "Chat failed")
       }
-    } catch (err: any) {
-      console.error("AI chat error", err)
-      setError(err?.message || t("aiAssistPage.chatFailed"))
+
+      const updated = [...nextHistory, data.message as ChatMessage]
+      setMessages(updated)
+      await persistChat(updated)
+    } catch (chatError: any) {
+      console.error("AI chat error", chatError)
+      setError(chatError?.message || t("aiAssistPage.chatFailed"))
+      setMessages(messages)
+    } finally {
+      setChatLoading(false)
     }
   }
 
+  const quickPrompts = [
+    "How should past history change the current treatment plan?",
+    "What contraindications should I watch for before prescribing?",
+    "Which follow-up tests or monitoring steps matter most now?",
+  ]
+
+  const suggestionSections = structuredSuggestions
+    ? [
+        structuredSuggestions.overview,
+        structuredSuggestions.previous_records_and_uploaded_context,
+        structuredSuggestions.history_informed_considerations,
+        structuredSuggestions.differentials,
+        structuredSuggestions.treatment_plan,
+        structuredSuggestions.investigations_and_monitoring,
+        structuredSuggestions.red_flags_and_contraindications,
+      ]
+    : []
+
   return (
     <ProtectedRoute>
-  <main className="min-h-screen bg-linear-to-br from-background to-muted">
-        <div className="container mx-auto py-8 px-4">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-8">
-            <Link href={`/dashboard/doctor/patient/${patientId}`}>
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-            </Link>
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-balance flex items-center gap-2">
-                <Sparkles className="w-8 h-8 text-primary" />
-                {t("docPatient.aiTreatmentTitle")}
-              </h1>
-              <p className="text-muted-foreground mt-1">{t("aiAssistPage.subtitle")}</p>
+      <main className="min-h-screen bg-linear-to-br from-background via-background to-muted/70">
+        <div className="container mx-auto px-4 py-8">
+          <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex items-start gap-4">
+              <Link href={`/dashboard/doctor/patient/${patientId}`}>
+                <Button variant="ghost" size="icon">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              </Link>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-primary">
+                  <Sparkles className="h-4 w-4" />
+                  <span>{t("docPatient.aiTreatmentTitle")}</span>
+                </div>
+                <h1 className="text-3xl font-bold text-balance">AI Suggestions Workspace</h1>
+                <p className="max-w-3xl text-sm text-muted-foreground">
+                  Review allergies, prior records, uploaded file summaries, and prescription history before generating the next plan.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Card className="min-w-28">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">Records</p>
+                  <p className="text-2xl font-semibold">{records.length}</p>
+                </CardContent>
+              </Card>
+              <Card className="min-w-28">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">Prescriptions</p>
+                  <p className="text-2xl font-semibold">{prescriptions.length}</p>
+                </CardContent>
+              </Card>
+              <Card className="min-w-28">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">Allergies</p>
+                  <p className="text-2xl font-semibold">{allergies.length}</p>
+                </CardContent>
+              </Card>
+              <Card className="min-w-28">
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">Files</p>
+                  <p className="text-2xl font-semibold">{medicalFiles.length}</p>
+                </CardContent>
+              </Card>
             </div>
           </div>
 
-          {/* Alert */}
-          <Alert className="mb-6 bg-blue-500/10 border-blue-500/20">
-            <Sparkles className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-600">{t("aiAssistPage.disclaimerAlert")}</AlertDescription>
+          <Alert className="mb-6 border-blue-500/20 bg-blue-500/10">
+            <ShieldAlert className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-700 dark:text-blue-300">
+              {t("aiAssistPage.disclaimerAlert")}
+            </AlertDescription>
           </Alert>
 
-          {/* 40:60 Split */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-            {/* Left Pane (40%) */}
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle>{t("aiAssistPage.currentCondition")}</CardTitle>
-                <CardDescription>{t("aiAssistPage.currentConditionDesc")}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {error && (
-                  <div className="mb-4 p-3 bg-destructive/10 text-destructive text-sm rounded-md">{error}</div>
-                )}
-                <form onSubmit={handleGenerate} className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">{t("aiAssistPage.workingDiagnosis")}</label>
-                    <Input
-                      value={diagnosis}
-                      onChange={(e) => setDiagnosis(e.target.value)}
-                      placeholder={t("docPatient.diagnosisPh")}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">{t("mr.symptomsLabel")}</label>
-                    <Input
-                      value={symptoms}
-                      onChange={(e) => setSymptoms(e.target.value)}
-                      placeholder={t("docPatient.symptomsPh")}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">{t("aiAssistPage.chiefComplaint")}</label>
-                    <textarea
-                      className="w-full min-h-24 px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                      placeholder={t("aiAssistPage.chiefComplaintPh")}
-                      value={condition}
-                      onChange={(e) => setCondition(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">{t("aiAssistPage.additionalNotesOpt")}</label>
-                    <textarea
-                      className="w-full min-h-24 px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                      placeholder={t("aiAssistPage.additionalNotesPh")}
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                    />
-                  </div>
-                  <Button type="submit" disabled={loading} className="w-full">
-                    {loading ? t("aiAssistPage.generating") : t("aiAssistPage.generateSuggestions")}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+          {error ? (
+            <Alert className="mb-6 border-destructive/30 bg-destructive/10">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <AlertDescription className="text-destructive">{error}</AlertDescription>
+            </Alert>
+          ) : null}
 
-            {/* Right Pane (60%) */}
-            <div className="md:col-span-3 space-y-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>{t("aiAssistPage.suggestionsTitle")}</CardTitle>
-                    <CardDescription>
-                      {diagnosis ? `${t("aiAssistPage.summaryDiagnosis", undefined, { v: diagnosis })} | ` : ""}
-                      {symptoms ? t("aiAssistPage.summarySymptoms", undefined, { v: symptoms }) : ""}
-                    </CardDescription>
-                  </div>
-                  {!loading && suggestions && (
-                    <Button onClick={handleCopy} variant="outline" size="sm" className="gap-2 bg-transparent">
-                      {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      {copied ? t("aiAssistPage.copied") : t("aiAssistPage.copy")}
-                    </Button>
-                  )}
+          <div className="grid gap-6 xl:grid-cols-[1.05fr_1.35fr]">
+            <div className="space-y-6">
+              <Card className="border-primary/15 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <UserIcon className="h-5 w-5 text-primary" />
+                    Patient Snapshot
+                  </CardTitle>
+                  <CardDescription>
+                    Core patient context that should influence the current assessment.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {loading ? (
-                    <div className="flex items-center justify-center py-12">
-                      <div className="text-center space-y-4">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
-                        <p className="text-muted-foreground">{t("aiAssistPage.generatingWait")}</p>
-                      </div>
-                    </div>
-                  ) : suggestions ? (
-                    <div className="prose prose-invert max-w-none text-sm leading-relaxed">
-                      <Markdown remarkPlugins={[remarkGfm as any]}>
-                        {suggestions}
-                      </Markdown>
+                  {contextLoading ? (
+                    <div className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading patient context...
                     </div>
                   ) : (
-                    <p className="text-muted-foreground text-sm">{t("aiAssistPage.fillPanelHint")}</p>
+                    <div className="space-y-5">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <InfoBlock label="Patient" value={patient?.name || "—"} />
+                        <InfoBlock label="Age / Gender" value={patientAge ? `${patientAge} yrs${patient?.gender ? ` • ${patient.gender}` : ""}` : patient?.gender || "—"} />
+                        <InfoBlock label="Blood Group" value={patient?.bloodGroup || "—"} />
+                        <InfoBlock label="Email" value={patient?.email || "—"} />
+                      </div>
+
+                      <SectionBlock
+                        title="Allergies"
+                        icon={<ShieldAlert className="h-4 w-4 text-amber-600" />}
+                        empty="No allergies recorded"
+                        items={allergies}
+                        tone={allergies.length ? "warning" : "neutral"}
+                      />
+
+                      <SectionBlock
+                        title="Past Medical History"
+                        icon={<Stethoscope className="h-4 w-4 text-primary" />}
+                        empty="No medical history recorded"
+                        items={medicalHistory}
+                        tone="neutral"
+                      />
+                    </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Chat */}
               <Card>
                 <CardHeader>
-                  <CardTitle>{t("aiAssistPage.followUpTitle")}</CardTitle>
-                  <CardDescription>{t("aiAssistPage.followUpDesc")}</CardDescription>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Brain className="h-5 w-5 text-primary" />
+                    Current Visit Inputs
+                  </CardTitle>
+                  <CardDescription>
+                    These details are sent together with prior history and uploaded file summaries.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3 max-h-[360px] overflow-y-auto pr-2">
-                    {messages.length === 0 ? (
-                      <p className="text-muted-foreground text-sm">{t("aiAssistPage.noMessagesYet")}</p>
+                  <form onSubmit={handleGenerate} className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">{t("aiAssistPage.workingDiagnosis")}</label>
+                      <Input
+                        value={diagnosis}
+                        onChange={(e) => setDiagnosis(e.target.value)}
+                        placeholder={t("docPatient.diagnosisPh")}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">{t("mr.symptomsLabel")}</label>
+                      <Input
+                        value={symptoms}
+                        onChange={(e) => setSymptoms(e.target.value)}
+                        placeholder={t("docPatient.symptomsPh")}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">{t("aiAssistPage.chiefComplaint")}</label>
+                      <Textarea
+                        value={condition}
+                        onChange={(e) => setCondition(e.target.value)}
+                        placeholder={t("aiAssistPage.chiefComplaintPh")}
+                        className="min-h-24"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">{t("aiAssistPage.additionalNotesOpt")}</label>
+                      <Textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder={t("aiAssistPage.additionalNotesPh")}
+                        className="min-h-28"
+                      />
+                    </div>
+
+                    <Button type="submit" className="w-full gap-2" disabled={loading}>
+                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      {loading ? t("aiAssistPage.generating") : t("aiAssistPage.generateSuggestions")}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <FileText className="h-5 w-5 text-primary" />
+                    Uploaded Medical Files
+                  </CardTitle>
+                  <CardDescription>
+                    AI-extracted file summaries that may change the current recommendation.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {medicalFiles.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No uploaded medical files available for this patient.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {medicalFiles.slice(0, 5).map((file, index) => {
+                        const summary = file.summary || file.aiSummary || "No summary available"
+                        const keyFindings = Array.isArray(file.keyFindings)
+                          ? file.keyFindings
+                          : Array.isArray(file.details?.key_findings)
+                            ? file.details.key_findings
+                            : []
+
+                        return (
+                          <div key={`${file.originalFileName || "file"}-${index}`} className="rounded-xl border bg-muted/20 p-4">
+                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p className="font-medium">{file.originalFileName || `Uploaded file ${index + 1}`}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatDate(file.uploadedAt || file.uploadDate)}
+                                </p>
+                              </div>
+                              {file.category ? <Badge variant="secondary">{file.category.replace(/_/g, " ")}</Badge> : null}
+                            </div>
+                            <p className="text-sm leading-6 text-foreground/90">{summary}</p>
+                            {keyFindings.length ? (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {keyFindings.slice(0, 6).map((finding: string, itemIndex: number) => (
+                                  <Badge key={`${finding}-${itemIndex}`} variant="outline" className="bg-background">
+                                    {finding}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-6">
+              <Card className="border-primary/15 shadow-sm">
+                <CardHeader className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                      Suggested Plan
+                    </CardTitle>
+                    <CardDescription>
+                      Output is generated using the current visit details plus the patient’s history, allergies, files, and recent prescriptions.
+                    </CardDescription>
+                  </div>
+                  {suggestions ? (
+                    <Button onClick={handleCopy} variant="outline" size="sm" className="gap-2 bg-transparent">
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copied ? t("aiAssistPage.copied") : t("aiAssistPage.copy")}
+                    </Button>
+                  ) : null}
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex min-h-80 items-center justify-center">
+                      <div className="space-y-3 text-center">
+                        <Loader2 className="mx-auto h-10 w-10 animate-spin text-primary" />
+                        <p className="text-sm text-muted-foreground">{t("aiAssistPage.generatingWait")}</p>
+                      </div>
+                    </div>
+                  ) : suggestions ? (
+                    <div className="space-y-4">
+                      {suggestionSections.length ? (
+                        <div className="grid gap-4">
+                          {suggestionSections.map((section, index) => (
+                            <SuggestionSectionCard key={`${section.title}-${index}`} section={section} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border bg-background p-5">
+                          <div className="prose max-w-none text-sm dark:prose-invert">
+                            <Markdown remarkPlugins={[remarkGfm as any]}>{suggestions}</Markdown>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <Button className="w-full gap-2" onClick={handleUseSuggestions}>
+                          <ClipboardPlus className="h-4 w-4" />
+                          {t("aiAssistPage.useSuggestions")}
+                        </Button>
+                        <Link href={`/dashboard/doctor/patient/${patientId}`}>
+                          <Button variant="outline" className="w-full bg-transparent">
+                            {t("aiAssistPage.backToPatient")}
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed p-8 text-center">
+                      <Sparkles className="mx-auto mb-3 h-8 w-8 text-primary" />
+                      <p className="font-medium">No suggestions generated yet</p>
+                      <p className="mt-2 text-sm text-muted-foreground">{t("aiAssistPage.fillPanelHint")}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Stethoscope className="h-5 w-5 text-primary" />
+                      Recent Records
+                    </CardTitle>
+                    <CardDescription>Latest clinical notes and diagnoses for context.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {records.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No prior records found.</p>
                     ) : (
-                      messages.map((m, i) => (
-                        <div key={i} className={`flex gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                          {m.role === "assistant" && <Bot className="w-4 h-4 mt-1 text-primary" />}
-                          <div className={`rounded-lg px-3 py-2 text-sm max-w-[85%] ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-                            {m.role === "assistant" ? (
-                              <div className="prose prose-invert max-w-none">
-                                <Markdown remarkPlugins={[remarkGfm as any]}>
-                                  {m.content}
-                                </Markdown>
+                      <div className="space-y-3">
+                        {records.slice(0, 4).map((record) => (
+                          <div key={record.id || record._id} className="rounded-xl border bg-muted/20 p-4">
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <p className="font-medium">{record.diagnosis || "Visit record"}</p>
+                              <Badge variant="outline">{formatDate(record.date)}</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{summarizeRecord(record)}</p>
+                            {record.notes ? <p className="mt-2 text-sm leading-6">{record.notes}</p> : null}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Pill className="h-5 w-5 text-primary" />
+                      Recent Prescriptions
+                    </CardTitle>
+                    <CardDescription>Medication history to check duplications and interactions.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {prescriptions.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No prescription history found.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {prescriptions.slice(0, 4).map((rx) => (
+                          <div key={rx.id || rx._id} className="rounded-xl border bg-muted/20 p-4">
+                            <div className="mb-2 flex items-center justify-between gap-2">
+                              <p className="font-medium">{formatDate(rx.issuedDate)}</p>
+                              <Badge variant="outline">{Array.isArray(rx.medications) ? rx.medications.length : 0} meds</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{summarizePrescription(rx)}</p>
+                            {rx.notes ? <p className="mt-2 text-sm leading-6">{rx.notes}</p> : null}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    Follow-up Chat
+                  </CardTitle>
+                  <CardDescription>
+                    Ask targeted questions about contraindications, dose choices, workup, or how past history should change the plan.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex flex-wrap gap-2">
+                    {quickPrompts.map((prompt) => (
+                      <Button
+                        key={prompt}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!suggestions || chatLoading}
+                        className="max-w-full bg-transparent text-left whitespace-normal"
+                        onClick={() => setChatInput(prompt)}
+                      >
+                        {prompt}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="max-h-[420px] space-y-3 overflow-y-auto rounded-2xl border bg-muted/10 p-4">
+                    {messages.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">{t("aiAssistPage.noMessagesYet")}</p>
+                    ) : (
+                      messages.map((message, index) => (
+                        <div
+                          key={`${message.role}-${index}`}
+                          className={cn("flex gap-2", message.role === "user" ? "justify-end" : "justify-start")}
+                        >
+                          {message.role === "assistant" ? <Bot className="mt-1 h-4 w-4 text-primary" /> : null}
+                          <div
+                            className={cn(
+                              "max-w-[88%] rounded-2xl px-4 py-3 text-sm",
+                              message.role === "user" ? "bg-primary text-primary-foreground" : "bg-background border"
+                            )}
+                          >
+                            {message.role === "assistant" ? (
+                              <div className="prose max-w-none text-sm dark:prose-invert">
+                                <Markdown remarkPlugins={[remarkGfm as any]}>{message.content}</Markdown>
                               </div>
                             ) : (
-                              <div className="whitespace-pre-wrap">{m.content}</div>
+                              <div className="whitespace-pre-wrap">{message.content}</div>
                             )}
                           </div>
-                          {m.role === "user" && <UserIcon className="w-4 h-4 mt-1 text-muted-foreground" />}
+                          {message.role === "user" ? <UserIcon className="mt-1 h-4 w-4 text-muted-foreground" /> : null}
                         </div>
                       ))
                     )}
+
+                    {chatLoading ? (
+                      <div className="flex gap-2">
+                        <Bot className="mt-1 h-4 w-4 text-primary" />
+                        <div className="rounded-2xl border bg-background px-4 py-3 text-sm text-muted-foreground">
+                          <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                          Thinking through the follow-up question...
+                        </div>
+                      </div>
+                    ) : null}
                     <div ref={chatEndRef} />
                   </div>
-                  <form onSubmit={handleSendMessage} className="mt-3 flex gap-2">
+
+                  <form onSubmit={handleSendMessage} className="flex gap-2">
                     <Input
-                      placeholder={t("aiAssistPage.chatPlaceholder")}
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
-                      disabled={!suggestions}
+                      placeholder={t("aiAssistPage.chatPlaceholder")}
+                      disabled={!suggestions || chatLoading}
                     />
-                    <Button type="submit" disabled={!chatInput.trim() || !suggestions} className="gap-2">
-                      <Send className="w-4 h-4" />
+                    <Button type="submit" disabled={!chatInput.trim() || !suggestions || chatLoading} className="gap-2">
+                      {chatLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                       {t("aiAssistPage.send")}
                     </Button>
                   </form>
@@ -348,20 +786,73 @@ export default function AISuggestionsPage() {
               </Card>
             </div>
           </div>
-
-          {/* Footer Actions */}
-          <div className="flex gap-3 mt-6">
-            <Link href={`/dashboard/doctor/patient/${patientId}`} className="flex-1">
-              <Button variant="outline" className="w-full bg-transparent">
-                {t("aiAssistPage.backToPatient")}
-              </Button>
-            </Link>
-            <Link href={`/dashboard/doctor/patient/${patientId}`} className="flex-1">
-              <Button className="w-full">{t("aiAssistPage.useSuggestions")}</Button>
-            </Link>
-          </div>
         </div>
       </main>
     </ProtectedRoute>
+  )
+}
+
+function InfoBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border bg-muted/20 p-3">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 font-medium">{value}</p>
+    </div>
+  )
+}
+
+function SectionBlock({
+  title,
+  icon,
+  items,
+  empty,
+  tone,
+}: {
+  title: string
+  icon: ReactNode
+  items: string[]
+  empty: string
+  tone: "warning" | "neutral"
+}) {
+  return (
+    <div className={cn("rounded-2xl border p-4", tone === "warning" ? "border-amber-300/50 bg-amber-500/5" : "bg-muted/10")}>
+      <div className="mb-3 flex items-center gap-2">
+        {icon}
+        <h3 className="font-medium">{title}</h3>
+      </div>
+      {items.length ? (
+        <div className="flex flex-wrap gap-2">
+          {items.map((item, index) => (
+            <Badge key={`${item}-${index}`} variant={tone === "warning" ? "destructive" : "secondary"}>
+              {item}
+            </Badge>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">{empty}</p>
+      )}
+    </div>
+  )
+}
+
+function SuggestionSectionCard({ section }: { section: SuggestionSection }) {
+  return (
+    <div className="rounded-2xl border bg-background p-5 shadow-sm">
+      <div className="mb-3">
+        <h3 className="text-base font-semibold">{section.title}</h3>
+        {section.summary ? <p className="mt-1 text-sm leading-6 text-muted-foreground">{section.summary}</p> : null}
+      </div>
+
+      {section.items.length ? (
+        <div className="space-y-2">
+          {section.items.map((item, index) => (
+            <div key={`${item}-${index}`} className="flex gap-3 rounded-xl bg-muted/30 px-3 py-2 text-sm">
+              <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+              <p className="leading-6">{item}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
   )
 }
